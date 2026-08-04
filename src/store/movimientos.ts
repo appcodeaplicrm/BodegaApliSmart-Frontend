@@ -1,0 +1,169 @@
+import { useSyncExternalStore } from 'react'
+import { api, ApiError } from '../lib/api'
+
+export type TipoMovimiento = {
+  id: string
+  nombre: string
+  signo: 'E' | 'S' | '='
+}
+
+export type Movimiento = {
+  id: string
+  cantidad: number
+  cantidadBase: number
+  stockAnterior: number
+  stockNuevo: number
+  observacion: string | null
+  fecha: string
+  producto: {
+    id: string
+    nombre: string
+    codigo: string
+    unidadMedida: { id: string; abreviatura: string }
+  }
+  usuario: { id: string; nombre: string }
+  tipoMovimiento: { id: string; nombre: string; signo: string }
+  bodegaOrigen: { id: string; nombre: string } | null
+  bodegaDestino: { id: string; nombre: string } | null
+}
+
+type Estado =
+  | { status: 'idle' }
+  | { status: 'cargando' }
+  | {
+      status: 'listo'
+      movimientos: Movimiento[]
+      total: number
+      page: number
+      pageSize: number
+      totalPages: number
+    }
+  | { status: 'error'; mensaje: string }
+
+/** Filtros + paginación para `cargarPaginado`. */
+export type MovimientosQuery = {
+  bodegaId?: string
+  dias?: number
+  page: number
+  pageSize: number
+}
+
+/** Shape estándar de respuesta paginada del back. */
+export type PageResult<T> = {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+let estado: Estado = { status: 'idle' }
+let cacheSnapshot: Estado = estado
+let tiposCache: TipoMovimiento[] | null = null
+const listeners = new Set<() => void>()
+
+function emit() {
+  listeners.forEach((l) => l())
+}
+function subscribe(l: () => void) {
+  listeners.add(l)
+  return () => {
+    listeners.delete(l)
+  }
+}
+function getSnapshot(): Estado {
+  const e = estado
+  if (cacheSnapshot === e) return cacheSnapshot
+  if (cacheSnapshot.status !== e.status) {
+    cacheSnapshot = e
+    return cacheSnapshot
+  }
+  if (e.status === 'listo' && cacheSnapshot.status === 'listo') {
+    if (
+      cacheSnapshot.movimientos !== e.movimientos ||
+      cacheSnapshot.total !== e.total ||
+      cacheSnapshot.page !== e.page
+    ) {
+      cacheSnapshot = e
+      return cacheSnapshot
+    }
+  } else if (e.status === 'error' && cacheSnapshot.status === 'error') {
+    if (cacheSnapshot.mensaje !== e.mensaje) {
+      cacheSnapshot = e
+      return cacheSnapshot
+    }
+  }
+  return cacheSnapshot
+}
+function setEstado(next: Estado) {
+  estado = next
+  emit()
+}
+
+export const movimientosStore = {
+  subscribe,
+  getSnapshot,
+
+  async cargarPaginado(query: MovimientosQuery): Promise<PageResult<Movimiento>> {
+    setEstado({ status: 'cargando' })
+    try {
+      const params = new URLSearchParams()
+      if (query.bodegaId) params.set('bodegaId', query.bodegaId)
+      if (query.dias) params.set('dias', String(query.dias))
+      params.set('page', String(query.page))
+      params.set('pageSize', String(query.pageSize))
+      const result = await api.get<PageResult<Movimiento>>(
+        `/movimientos?${params.toString()}`,
+      )
+      setEstado({
+        status: 'listo',
+        movimientos: result.data,
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+        totalPages: result.totalPages,
+      })
+      return result
+    } catch (err) {
+      const mensaje =
+        err instanceof ApiError ? err.message : 'No se pudieron cargar los movimientos.'
+      setEstado({ status: 'error', mensaje })
+      throw err
+    }
+  },
+
+  async crear(input: {
+    productoId: string
+    tipoMovimientoId: string
+    cantidad: number
+    unidadMedidaId: string
+    bodegaOrigenId?: string
+    bodegaDestinoId?: string
+    ubicacionId?: string
+    observacion?: string
+  }): Promise<Movimiento> {
+    const movimiento = await api.post<Movimiento>('/movimientos', input)
+    // Con paginación, la mutación local del array ya no es útil:
+    // el front hace refetch de la página actual después de crear.
+    return movimiento
+  },
+
+  /** Catálogo de tipos (con cache en memoria). */
+  async tipos(): Promise<TipoMovimiento[]> {
+    if (tiposCache) return tiposCache
+    tiposCache = await api.get<TipoMovimiento[]>('/movimientos/tipos')
+    return tiposCache
+  },
+
+  reset() {
+    setEstado({ status: 'idle' })
+  },
+}
+
+export function useMovimientos() {
+  return useSyncExternalStore(
+    movimientosStore.subscribe,
+    movimientosStore.getSnapshot,
+    movimientosStore.getSnapshot,
+  )
+}
