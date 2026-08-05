@@ -22,6 +22,7 @@ import {
   type PendientePorPedido,
 } from '../store/devoluciones'
 import { Pagination } from './Pagination'
+import { PageHeader } from './PageHeader'
 import { CrearDevolucionModal } from './CrearDevolucionModal'
 import { DevolucionDetalleModal } from './DevolucionDetalleModal'
 
@@ -165,13 +166,14 @@ export function Devoluciones() {
   // Cargar pendientes solo si el banner se va a mostrar.
   // - Si es operador, filtramos por su `usuarioId` (defensa en profundidad).
   // - Si es admin, dejamos que el back traiga todos los pendientes de la bodega.
+  // - Filtramos por la bodega activa (re-carga cuando cambia).
   useEffect(() => {
-    if (!mostrarBannerPendientes) {
+    if (!mostrarBannerPendientes || !bodegaId) {
       setPendientes([])
       return
     }
     devolucionesStore
-      .cargarPendientes(operadorParaFiltro)
+      .cargarPendientes(operadorParaFiltro, bodegaId)
       .then((lista) =>
         setPendientes(
           esOperador && usuarioId
@@ -180,7 +182,14 @@ export function Devoluciones() {
         ),
       )
       .catch(() => setPendientes([]))
-  }, [mostrarBannerPendientes, operadorParaFiltro, usuarioId, esOperador, devState.status])
+  }, [
+    mostrarBannerPendientes,
+    operadorParaFiltro,
+    usuarioId,
+    esOperador,
+    bodegaId,
+    devState.status,
+  ])
 
   const todas = devState.status === 'listo' ? devState.devoluciones : []
   const total = devState.status === 'listo' ? devState.total : 0
@@ -237,48 +246,14 @@ export function Devoluciones() {
       : `Devoluciones que enviaste — ${usuarioNombre}`
 
   return (
-    <>
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-        <div className="p-8 space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-muted flex items-center justify-center shrink-0 mt-1">
-                <Undo2 size={20} className="text-primary" />
-              </div>
-              <div>
-                <h1
-                  className="text-4xl uppercase text-foreground leading-none"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-                >
-                  {titulo}
-                </h1>
-                <p
-                  className="mt-1 text-sm text-muted-foreground"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}
-                >
-                  {subtitulo}
-                </p>
-                <div
-                  className="mt-1 text-[10px] text-muted-foreground tracking-widest uppercase"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  Rol: {usuarioRol}
-                </div>
-              </div>
-            </div>
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <PageHeader
+        title={titulo}
+        subtitle={`STOCKPRO · ${usuarioRol.toUpperCase()}`}
+      />
 
-            {puedeCrear && (
-              <button
-                onClick={() => setOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-                style={{ borderRadius: '0.25rem' }}
-              >
-                <Plus size={16} />
-                Nueva Devolución
-              </button>
-            )}
-          </div>
-
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <div className="space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <StatTile label="Total" value={String(visibles.length)} accent="text-foreground" />
@@ -651,7 +626,7 @@ export function Devoluciones() {
       {detalle && (
         <DevolucionDetalleModal devolucion={detalle} onClose={() => setDetalle(null)} />
       )}
-    </>
+    </div>
   )
 }
 

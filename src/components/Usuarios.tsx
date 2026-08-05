@@ -17,13 +17,14 @@ import {
 import {
   useUsuarios,
   usuariosStore,
-  ROL_LABELS,
   type EstadoUsuario,
   type RolUsuario,
   type Usuario,
 } from '../store/usuarios'
 import { EditarUsuarioModal } from './EditarUsuarioModal'
 import { CrearUsuarioModal } from './CrearUsuarioModal'
+import { CambiarPasswordModal } from './CambiarPasswordModal'
+import { PageHeader } from './PageHeader'
 import { permisosStore } from '../store/permisos'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { Pagination } from './Pagination'
@@ -36,6 +37,7 @@ export function Usuarios() {
   const [query, setQuery] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<Usuario | null>(null)
   const [editing, setEditing] = useState<Usuario | null>(null)
+  const [changingPass, setChangingPass] = useState<Usuario | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -108,7 +110,7 @@ export function Usuarios() {
 
   const activos = usuarios.filter((u) => u.estado === 'Activo').length
   const inactivos = usuarios.filter((u) => u.estado === 'Inactivo').length
-  const tecnicos = usuarios.filter((u) => u.rol === 'tecnico').length
+  const rolesEnUso = new Set(usuarios.map((u) => u.rol).filter(Boolean)).size
 
   async function handleDelete(u: Usuario) {
     if (deleting) return
@@ -128,39 +130,23 @@ export function Usuarios() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-      <div className="p-8 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted flex items-center justify-center shrink-0 mt-1">
-              <Users size={20} className="text-primary" />
-            </div>
-            <div>
-              <h1
-                className="text-4xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                Gestión de Usuarios
-              </h1>
-              <p
-                className="mt-1 text-sm text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                Administra usuarios, roles y permisos del sistema
-              </p>
-            </div>
-          </div>
-
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <PageHeader
+        title="Gestión de Usuarios"
+        subtitle="STOCKPRO · ROLES Y PERMISOS"
+        actions={
           <button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
             style={{ borderRadius: '0.25rem' }}
           >
-            <Plus size={16} />
+            <Plus size={13} />
             Nuevo Usuario
           </button>
-        </div>
+        }
+      />
 
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatTile
             icon={Users}
@@ -183,8 +169,8 @@ export function Usuarios() {
           <StatTile
             icon={Wrench}
             iconClass="text-primary"
-            label="Técnicos"
-            value={String(tecnicos)}
+            label="Roles en uso"
+            value={String(rolesEnUso)}
           />
         </div>
 
@@ -337,7 +323,7 @@ export function Usuarios() {
                         </span>
                       </Td>
                       <Td>
-                        <RolBadge rol={u.rol} />
+                        <RolBadge rol={u.rol} rolNombre={u.rolNombre} />
                       </Td>
                       <Td>
                         <EstadoBadge estado={u.estado} />
@@ -353,6 +339,7 @@ export function Usuarios() {
                           <IconAction
                             label="Cambiar contraseña"
                             hoverClass="hover:border-secondary/40 hover:text-secondary"
+                            onClick={() => setChangingPass(u)}
                           >
                             <KeyRound size={14} />
                           </IconAction>
@@ -400,6 +387,13 @@ export function Usuarios() {
         <EditarUsuarioModal
           usuario={editing}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {changingPass && (
+        <CambiarPasswordModal
+          usuario={changingPass}
+          onClose={() => setChangingPass(null)}
         />
       )}
 
@@ -534,7 +528,10 @@ function StatTile({
   )
 }
 
-function RolBadge({ rol }: { rol: RolUsuario }) {
+function RolBadge({ rol, rolNombre }: { rol: RolUsuario; rolNombre?: string }) {
+  // Como los roles son custom, mostramos el `rolNombre` (que viene del
+  // back con el label legible) o, en su defecto, el `key` en mayúsculas.
+  const label = rolNombre?.trim() || rol.toUpperCase() || '—'
   return (
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] border border-primary/40 text-primary bg-primary/10"
@@ -546,7 +543,7 @@ function RolBadge({ rol }: { rol: RolUsuario }) {
       }}
     >
       <ShieldCheck size={10} />
-      {ROL_LABELS[rol]}
+      {label}
     </span>
   )
 }

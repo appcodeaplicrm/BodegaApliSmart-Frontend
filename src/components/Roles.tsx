@@ -29,6 +29,10 @@ import {
   type Rol,
 } from '../store/permisos'
 import { authStore } from '../store/auth'
+import { api } from '../lib/api'
+import { PageHeader } from './PageHeader'
+
+type CatalogoPermiso = { key: string; modulo: string; accion: string }
 
 export function Roles() {
   const { roles } = usePermisos()
@@ -38,6 +42,8 @@ export function Roles() {
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Rol | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [catalogoPlan, setCatalogoPlan] = useState<CatalogoPermiso[]>([])
+  const [catalogoCargando, setCatalogoCargando] = useState(true)
 
   // El módulo `admin` (y su sub-módulo `tenants`) es solo para el
   // superadmin. Los admins comunes no deberían verlo ni asignarlo
@@ -45,10 +51,13 @@ export function Roles() {
   // no muestre esa sección.
   const sesion = authStore.getSesion()
   const esSuperadmin = sesion?.usuario.rol === 'superadmin'
-  const modulosVisibles = useMemo(
-    () => (esSuperadmin ? MODULOS : MODULOS.filter((m) => m.key !== 'admin')),
-    [esSuperadmin],
-  )
+  const permisosDisponibles = useMemo(() => new Set(catalogoPlan.map((p) => p.key)), [catalogoPlan])
+  const modulosVisibles = useMemo(() => MODULOS.filter((m) =>
+    (esSuperadmin || m.key !== 'admin') && catalogoPlan.some((p) => p.modulo === m.key || p.modulo.startsWith(`${m.key}.`)),
+  ).map((m) => ({
+    ...m,
+    submodulos: m.submodulos?.filter((s) => catalogoPlan.some((p) => p.modulo === `${m.key}.${s.key}`)),
+  })), [catalogoPlan, esSuperadmin])
 
   // Cargar roles del back al montar la pantalla (si todavía no se cargaron).
   useEffect(() => {
@@ -56,6 +65,13 @@ export function Roles() {
       void permisosStore.cargar().catch(() => undefined)
     }
   }, [estadoStore.status])
+
+  useEffect(() => {
+    void api.get<CatalogoPermiso[]>('/permisos')
+      .then(setCatalogoPlan)
+      .catch(() => setCatalogoPlan([]))
+      .finally(() => setCatalogoCargando(false))
+  }, [])
 
   const filtrados = query.trim()
     ? roles.filter(
@@ -66,39 +82,25 @@ export function Roles() {
     : roles
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-      <div className="p-8 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted flex items-center justify-center shrink-0 mt-1">
-              <ShieldCheck size={20} className="text-primary" />
-            </div>
-            <div>
-              <h1
-                className="text-4xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                Roles y Permisos
-              </h1>
-              <p
-                className="mt-1 text-sm text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                Configura qué puede hacer cada rol en cada módulo y sub-módulo
-              </p>
-            </div>
-          </div>
-
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <PageHeader
+        title="Roles y Permisos"
+        subtitle="STOCKPRO · MATRIZ DE PERMISOS"
+        actions={
           <button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            disabled={catalogoCargando}
+            title={catalogoCargando ? 'Cargando permisos disponibles del plan…' : 'Crear un nuevo rol'}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-wait"
             style={{ borderRadius: '0.25rem' }}
           >
-            <Plus size={16} />
+            <Plus size={13} />
             Nuevo Rol
           </button>
-        </div>
+        }
+      />
 
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="relative">
           <Search
             size={15}
@@ -208,6 +210,7 @@ export function Roles() {
             setCreating(false)
           }}
           modulosVisibles={modulosVisibles}
+          permisosDisponibles={permisosDisponibles}
         />
       )}
 
@@ -225,6 +228,7 @@ export function Roles() {
             }
           }}
           modulosVisibles={modulosVisibles}
+          permisosDisponibles={permisosDisponibles}
         />
       )}
 
@@ -365,14 +369,6 @@ function RolCard({
                   SISTEMA
                 </span>
               )}
-              {rol.usuariosCount > 0 && (
-                <span
-                  className="inline-flex items-center px-1.5 py-0.5 text-[10px] border border-secondary/40 text-secondary bg-secondary/10"
-                  style={{ borderRadius: '0.15rem', fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  {rol.usuariosCount} usuario{rol.usuariosCount === 1 ? '' : 's'}
-                </span>
-              )}
             </div>
             <p
               className="mt-1 text-sm text-muted-foreground"
@@ -430,10 +426,12 @@ function MatrizPermisos({
   selected,
   onToggle,
   modulosVisibles = MODULOS,
+  permisosDisponibles,
 }: {
   selected: Set<Permiso>
   onToggle: (p: Permiso) => void
   modulosVisibles?: readonly ModuloDef[]
+  permisosDisponibles: ReadonlySet<string>
 }) {
   const [expanded, setExpanded] = useState<Set<ModuloKey>>(
     () => new Set(modulosVisibles.filter((m) => m.submodulos?.length).map((m) => m.key)),
@@ -485,11 +483,12 @@ function MatrizPermisos({
                   modulo={m}
                   selected={selected}
                   onToggle={onToggle}
+                  permisosDisponibles={permisosDisponibles}
                 />
               )
             }
             const isOpen = expanded.has(m.key)
-            const subKeys = subs.flatMap((s) => keysSubmodulo(m.key, s.key))
+            const subKeys = subs.flatMap((s) => keysSubmodulo(m.key, s.key)).filter((k) => permisosDisponibles.has(k))
             const subOn = subKeys.filter((k) => selected.has(k)).length
             return (
               <ModuloPadreGrupo
@@ -509,6 +508,7 @@ function MatrizPermisos({
                 }}
                 subOn={subOn}
                 subTotal={subKeys.length}
+                permisosDisponibles={permisosDisponibles}
               />
             )
           })}
@@ -522,21 +522,24 @@ function ModuloFila({
   modulo,
   selected,
   onToggle,
+  permisosDisponibles,
 }: {
   modulo: ModuloDef
   selected: Set<Permiso>
   onToggle: (p: Permiso) => void
+  permisosDisponibles: ReadonlySet<string>
 }) {
-  const allOn = modulo.acciones.every((a) => selected.has(`${modulo.key}.${a}`))
-  const someOn = modulo.acciones.some((a) => selected.has(`${modulo.key}.${a}`))
+  const accionesDisponibles = modulo.acciones.filter((a) => permisosDisponibles.has(`${modulo.key}.${a}`))
+  const allOn = accionesDisponibles.length > 0 && accionesDisponibles.every((a) => selected.has(`${modulo.key}.${a}`))
+  const someOn = accionesDisponibles.some((a) => selected.has(`${modulo.key}.${a}`))
 
   function toggleTodo() {
     if (allOn) {
-      for (const a of modulo.acciones) {
+      for (const a of accionesDisponibles) {
         if (selected.has(`${modulo.key}.${a}`)) onToggle(`${modulo.key}.${a}`)
       }
     } else {
-      for (const a of modulo.acciones) {
+      for (const a of accionesDisponibles) {
         if (!selected.has(`${modulo.key}.${a}`)) onToggle(`${modulo.key}.${a}`)
       }
     }
@@ -552,6 +555,7 @@ function ModuloFila({
       </td>
       {ACCIONES.map((a) => {
         const p = `${modulo.key}.${a}`
+        if (!permisosDisponibles.has(p)) return <td key={a} className="text-center px-3 py-2 text-muted-foreground/40">—</td>
         const has = selected.has(p)
         return (
           <td key={a} className="text-center px-3 py-2">
@@ -585,6 +589,7 @@ function ModuloPadreGrupo({
   onToggleTodoGrupo,
   subOn,
   subTotal,
+  permisosDisponibles,
 }: {
   modulo: ModuloDef
   isOpen: boolean
@@ -595,10 +600,11 @@ function ModuloPadreGrupo({
   onToggleTodoGrupo: () => void
   subOn: number
   subTotal: number
+  permisosDisponibles: ReadonlySet<string>
 }) {
   const verPadre = keyVerPadre(modulo.key)
   const tieneVerPadre = selected.has(verPadre)
-  const allOn = subOn === subTotal
+  const allOn = subTotal > 0 && subOn === subTotal
 
   return (
     <>
@@ -623,6 +629,7 @@ function ModuloPadreGrupo({
         </td>
         {ACCIONES.map((a) => {
           if (a === 'ver') {
+            if (!permisosDisponibles.has(verPadre)) return <td key={a} className="text-center px-3 py-2 text-muted-foreground/40">—</td>
             return (
               <td key={a} className="text-center px-3 py-2">
                 <CellToggle
@@ -652,7 +659,7 @@ function ModuloPadreGrupo({
       </tr>
       {isOpen &&
         submodulos.map((s) => {
-          const subKeys = keysSubmodulo(modulo.key, s.key)
+          const subKeys = keysSubmodulo(modulo.key, s.key).filter((k) => permisosDisponibles.has(k))
           const allSubOn = subKeys.every((k) => selected.has(k))
           const someSubOn = subKeys.some((k) => selected.has(k))
           return (
@@ -674,6 +681,7 @@ function ModuloPadreGrupo({
               </td>
               {ACCIONES.map((a) => {
                 const p: Permiso = `${modulo.key}.${s.key}.${a}`
+                if (!permisosDisponibles.has(p)) return <td key={a} className="text-center px-3 py-2 text-muted-foreground/40">—</td>
                 const has = selected.has(p)
                 return (
                   <td key={a} className="text-center px-3 py-2">
@@ -744,17 +752,19 @@ function RolEditorModal({
   onClose,
   onSave,
   modulosVisibles = MODULOS,
+  permisosDisponibles,
 }: {
   rol?: Rol
   onClose: () => void
   onSave: (data: { nombre: string; descripcion: string; permisos: Permiso[] }) => Promise<void> | void
   modulosVisibles?: readonly ModuloDef[]
+  permisosDisponibles: ReadonlySet<string>
 }) {
   const isNew = !rol
   const [nombre, setNombre] = useState(rol?.nombre ?? '')
   const [descripcion, setDescripcion] = useState(rol?.descripcion ?? '')
   const [permisos, setPermisos] = useState<Set<Permiso>>(
-    () => new Set(rol?.permisos ?? []),
+    () => new Set((rol?.permisos ?? []).filter((p) => permisosDisponibles.has(p))),
   )
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -888,6 +898,7 @@ function RolEditorModal({
               selected={permisos}
               onToggle={toggle}
               modulosVisibles={modulosVisibles}
+              permisosDisponibles={permisosDisponibles}
             />
           </div>
 

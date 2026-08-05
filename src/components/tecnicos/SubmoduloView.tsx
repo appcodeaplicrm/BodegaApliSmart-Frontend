@@ -1,46 +1,29 @@
 import { Plus, Inbox } from 'lucide-react'
 import type { Submodulo } from './tecnicos'
+import { PageHeader } from '../PageHeader'
 
 type SubmoduloViewProps = {
   sub: Submodulo
 }
 
 export function SubmoduloView({ sub }: SubmoduloViewProps) {
-  const Icon = sub.icon
-
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-      <div className="p-8 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted flex items-center justify-center shrink-0 mt-1">
-              <Icon size={20} className="text-primary" />
-            </div>
-            <div>
-              <h1
-                className="text-4xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                {sub.label}
-              </h1>
-              <p
-                className="mt-1 text-sm text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                {sub.descripcion}
-              </p>
-            </div>
-          </div>
-
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <PageHeader
+        title={sub.label}
+        subtitle="STOCKPRO · TÉCNICOS"
+        actions={
           <button
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
             style={{ borderRadius: '0.25rem' }}
           >
-            <Plus size={16} />
+            <Plus size={13} />
             {sub.accion}
           </button>
-        </div>
+        }
+      />
 
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {sub.kpis.map((k) => (
             <div

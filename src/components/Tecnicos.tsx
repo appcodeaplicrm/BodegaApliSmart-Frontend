@@ -2,8 +2,8 @@ import { getSubmodulo, SUBMODULOS_TECNICOS } from './tecnicos/tecnicos'
 import { SubmoduloView } from './tecnicos/SubmoduloView'
 import { Ordenes } from './Ordenes'
 import { Link } from 'react-router-dom'
-import { HardHat } from 'lucide-react'
 import { useAuth } from '../store/auth'
+import { PageHeader } from './PageHeader'
 
 type TecnicosProps = {
   subKey: string
@@ -47,28 +47,13 @@ export function TecnicosIndex() {
   })
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-      <div className="p-8 space-y-6">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-muted flex items-center justify-center shrink-0 mt-1">
-            <HardHat size={20} className="text-primary" />
-          </div>
-          <div>
-            <h1
-              className="text-4xl uppercase text-foreground leading-none"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-            >
-              Técnicos
-            </h1>
-            <p
-              className="mt-1 text-sm text-muted-foreground"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Sub-módulos disponibles para tu rol
-            </p>
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <PageHeader
+        title="Técnicos"
+        subtitle="STOCKPRO · SUB-MÓDULOS DISPONIBLES"
+      />
 
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {visibles.map((sub) => {
             const Icon = sub.icon

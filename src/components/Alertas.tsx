@@ -11,6 +11,7 @@ import {
 import { alertasStore, useAlertas, type AlertaStock, type NivelAlerta } from '../store/alertas'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
+import { PageHeader } from './PageHeader'
 
 export function Alertas() {
   const auth = useAuth()
@@ -58,43 +59,28 @@ export function Alertas() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-      <div className="p-8 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted flex items-center justify-center shrink-0 mt-1">
-              <AlertTriangle size={20} className="text-primary" />
-            </div>
-            <div>
-              <h1
-                className="text-4xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                Alertas
-              </h1>
-              <p
-                className="mt-1 text-sm text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                Stock bajo, sin stock y otras alertas activas
-              </p>
-            </div>
-          </div>
-
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <PageHeader
+        title="Alertas"
+        subtitle="STOCKPRO · STOCK BAJO Y SIN STOCK"
+        actions={
           <button
             type="button"
             onClick={handleRefresh}
             disabled={state.status === 'cargando' || !activaId}
-            className="inline-flex items-center gap-1.5 px-3 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border text-xs text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '0.25rem' }}
             aria-label="Refrescar"
           >
             <RefreshCcw
-              size={14}
+              size={13}
               className={state.status === 'cargando' ? 'animate-spin' : ''}
             />
           </button>
-        </div>
+        }
+      />
+
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

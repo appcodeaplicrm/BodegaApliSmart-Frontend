@@ -1,51 +1,119 @@
-const plans = [
-  {
-    name: 'inicial',
-    price: 49,
-    desc: 'para bodegas que están digitalizando sus primeras operaciones.',
-    features: [
-      'hasta 2 usuarios',
-      '1.000 sku activos',
-      'app móvil incluida',
-      'soporte por email',
-      'reportes básicos',
-    ],
-    cta: 'Empezar',
-    highlight: false,
-  },
-  {
-    name: 'pro',
-    price: 149,
-    desc: 'la opción más elegida por operadores logísticos en crecimiento.',
-    features: [
-      'hasta 15 usuarios',
-      'sku ilimitados',
-      'mapa de bodega 3d',
-      'integración con erp',
-      'soporte 24/7',
-      'auditoría firmada',
-    ],
-    cta: 'Prueba 14 días',
-    highlight: true,
-  },
-  {
-    name: 'enterprise',
-    price: null,
-    desc: 'multi-bodega, rpa personalizado y sla dedicado.',
-    features: [
-      'usuarios ilimitados',
-      'multi-sede',
-      'api dedicada',
-      'gerente de cuenta',
-      'capacitación on-site',
-      'sla 99.9%',
-    ],
-    cta: 'Hablar con ventas',
-    highlight: false,
-  },
-]
+import { useEffect, useState } from 'react'
+import { api } from '../lib/api'
+
+/**
+ * Plan público que devuelve `GET /public/plans` (sin auth).
+ * Misma forma que el back: `priceAmount` viene en centavos (USD * 100).
+ * `features` solo trae las que están `enabled: true` en el plan.
+ */
+type PublicPlan = {
+  id: string
+  code: string
+  name: string
+  description: string | null
+  priceAmount: number | null
+  currency: string
+  billingPeriod: string
+  features: {
+    code: string
+    name: string
+    type: string
+    unit: string | null
+    limitValue: number | null
+  }[]
+}
+
+type PlanView = {
+  id: string
+  code: string
+  name: string
+  desc: string
+  price: number | null
+  features: string[]
+  cta: string
+  highlight: boolean
+}
+
+const CTA_POR_PLAN: Record<string, string> = {
+  starter: 'Empezar',
+  inicial: 'Empezar',
+  pro: 'Prueba 14 días',
+  enterprise: 'Hablar con ventas',
+}
+
+const HIGHLIGHT_POR_CODIGO = new Set(['pro'])
+
+/**
+ * Traduce los features de un plan (los del catálogo del back) a bullets
+ * legibles para el pricing. Ej: `warehouses:limitValue:5` →
+ * "hasta 5 bodegas". Si la feature no tiene límite, usamos la versión
+ * "ilimitada" del nombre.
+ */
+function featuresABullets(plan: PublicPlan): string[] {
+  const out: string[] = []
+  for (const f of plan.features) {
+    out.push(featureABullet(f.code, f.limitValue))
+  }
+  return out
+}
+
+function featureABullet(code: string, limit: number | null): string {
+  switch (code) {
+    case 'users':
+      return limit == null ? 'usuarios ilimitados' : `hasta ${limit} usuarios`
+    case 'warehouses':
+      return limit == null ? 'bodegas ilimitadas' : `hasta ${limit} bodegas`
+    case 'products':
+      return limit == null ? 'productos ilimitados' : `hasta ${limit} productos`
+    case 'custom_roles':
+      return limit == null
+        ? 'roles personalizados ilimitados'
+        : `hasta ${limit} roles personalizados`
+    default:
+      // Feature desconocida: la mostramos tal cual viene del back
+      return limit == null ? code : `${code} (máx. ${limit})`
+  }
+}
 
 export function Pricing() {
+  const [planes, setPlanes] = useState<PlanView[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelado = false
+    void api
+      .get<PublicPlan[]>('/public/plans')
+      .then((data) => {
+        if (cancelado) return
+        const mapped: PlanView[] = data.map((p) => ({
+          id: p.id,
+          code: p.code,
+          name: p.name,
+          desc: p.description ?? '',
+          price: p.priceAmount == null ? null : Math.round(p.priceAmount / 100),
+          features: featuresABullets(p),
+          cta: CTA_POR_PLAN[p.code] ?? 'Empezar',
+          highlight: HIGHLIGHT_POR_CODIGO.has(p.code),
+        }))
+        setPlanes(mapped)
+      })
+      .catch(() => {
+        if (cancelado) return
+        // Si falla el endpoint público, caemos al fallback hardcoded
+        // (mejor mostrar algo que nada). El endpoint requiere que el
+        // superadmin haya publicado al menos un plan.
+        setPlanes(FALLBACK_PLANS)
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [])
+
+  const visibles = loading ? FALLBACK_PLANS : planes
+
   return (
     <section id="pricing" className="py-24">
       <div className="max-w-7xl mx-auto px-6">
@@ -72,7 +140,7 @@ export function Pricing() {
         </div>
 
         <div className="grid sm:grid-cols-3 gap-6">
-          {plans.map((p) => (
+          {visibles.map((p) => (
             <div
               key={p.name}
               className={`relative bg-card border ${
@@ -160,3 +228,61 @@ export function Pricing() {
     </section>
   )
 }
+
+/**
+ * Fallback hardcoded para cuando el endpoint público falla (ej: el
+ * superadmin aún no publicó ningún plan, o el back está caído). Mejor
+ * mostrar algo decente que una pantalla en blanco.
+ */
+const FALLBACK_PLANS: PlanView[] = [
+  {
+    id: 'fallback-inicial',
+    code: 'inicial',
+    name: 'Inicial',
+    desc: 'para bodegas que están digitalizando sus primeras operaciones.',
+    price: 49,
+    features: [
+      'hasta 2 usuarios',
+      '1.000 sku activos',
+      'app móvil incluida',
+      'soporte por email',
+      'reportes básicos',
+    ],
+    cta: 'Empezar',
+    highlight: false,
+  },
+  {
+    id: 'fallback-pro',
+    code: 'pro',
+    name: 'Pro',
+    desc: 'la opción más elegida por operadores logísticos en crecimiento.',
+    price: 149,
+    features: [
+      'hasta 15 usuarios',
+      'sku ilimitados',
+      'mapa de bodega 3d',
+      'integración con erp',
+      'soporte 24/7',
+      'auditoría firmada',
+    ],
+    cta: 'Prueba 14 días',
+    highlight: true,
+  },
+  {
+    id: 'fallback-enterprise',
+    code: 'enterprise',
+    name: 'Enterprise',
+    desc: 'multi-bodega, rpa personalizado y sla dedicado.',
+    price: null,
+    features: [
+      'usuarios ilimitados',
+      'multi-sede',
+      'api dedicada',
+      'gerente de cuenta',
+      'capacitación on-site',
+      'sla 99.9%',
+    ],
+    cta: 'Hablar con ventas',
+    highlight: false,
+  },
+]

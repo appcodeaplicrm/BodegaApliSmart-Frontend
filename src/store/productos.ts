@@ -53,6 +53,10 @@ export type ProductoListItem = {
   unidadMedida: { id: string; nombre: string; abreviatura: string; permiteDecimales: boolean }
   stocks: StockPorBodega[]
   _count: { documentos: number; conversiones: number; proveedores: number }
+  /** URL de la foto principal del producto (miniatura del listado). */
+  fotoUrl?: string | null
+  /** Key de la foto principal (multi-tenant). */
+  fotoKey?: string | null
 }
 
 export type Producto = ProductoListItem & {
@@ -145,6 +149,11 @@ type Estado =
 
 let estado: Estado = { status: 'idle' }
 let cacheSnapshot: Estado = estado
+/**
+ * Cache del último query usado en `cargarPaginado`. Sirve para que
+ * los handlers realtime puedan hacer un refetch silencioso.
+ */
+let lastQuery: ProductosQuery | null = null
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -195,18 +204,10 @@ export const productosStore = {
    * pueda mostrar "Mostrando X-Y de Z" y los botones de paginación.
    */
   async cargarPaginado(query: ProductosQuery): Promise<PageResult<ProductoListItem>> {
+    lastQuery = query
     setEstado({ status: 'cargando' })
     try {
-      const params = new URLSearchParams()
-      if (query.bodegaId) params.set('bodegaId', query.bodegaId)
-      if (query.buscar) params.set('buscar', query.buscar)
-      if (query.categoriaId) params.set('categoriaId', query.categoriaId)
-      if (query.marcaId) params.set('marcaId', query.marcaId)
-      params.set('page', String(query.page))
-      params.set('pageSize', String(query.pageSize))
-      const result = await api.get<PageResult<ProductoListItem>>(
-        `/productos?${params.toString()}`,
-      )
+      const result = await this.fetchPaginado(query)
       setEstado({
         status: 'listo',
         productos: result.data,
@@ -221,6 +222,43 @@ export const productosStore = {
       setEstado({ status: 'error', mensaje })
       throw err
     }
+  },
+
+  /**
+   * Refetch silencioso: igual a `cargarPaginado` pero NO cambia el
+   * status a 'cargando' (la lista sigue mostrándose, no parpadea).
+   * Usado por los handlers realtime para re-sincronizar después de
+   * un cambio (ej: stock de un producto cambió por un movimiento).
+   */
+  async recargarSilencioso(): Promise<void> {
+    if (!lastQuery) return
+    try {
+      const result = await this.fetchPaginado(lastQuery)
+      if (estado.status === 'listo') {
+        setEstado({
+          status: 'listo',
+          productos: result.data,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          totalPages: result.totalPages,
+        })
+      }
+    } catch {
+      // Silencioso: si falla, el próximo GET manual del usuario lo arregla
+    }
+  },
+
+  /** Helper interno: hace el GET al back con el query dado. */
+  async fetchPaginado(query: ProductosQuery): Promise<PageResult<ProductoListItem>> {
+    const params = new URLSearchParams()
+    if (query.bodegaId) params.set('bodegaId', query.bodegaId)
+    if (query.buscar) params.set('buscar', query.buscar)
+    if (query.categoriaId) params.set('categoriaId', query.categoriaId)
+    if (query.marcaId) params.set('marcaId', query.marcaId)
+    params.set('page', String(query.page))
+    params.set('pageSize', String(query.pageSize))
+    return api.get<PageResult<ProductoListItem>>(`/productos?${params.toString()}`)
   },
 
   async findOne(id: string): Promise<Producto> {
@@ -265,6 +303,52 @@ export const productosStore = {
 
   reset() {
     setEstado({ status: 'idle' })
+  },
+
+  /**
+   * Handler para el evento realtime `movimiento.created`.
+   *
+   * Estrategia: refetch silencioso del back con el último query. Esto
+   * actualiza la lista con la nueva cantidad de stock del producto
+   * afectado (vino en el payload pero el back lo recalcula todo en el
+   * `GET /productos?bodegaId=X`).
+   *
+   * Si el evento es de una bodega distinta a la del query, ignora.
+   */
+  async handleMovimientoCreado(event: {
+    bodegaId: string | null
+  }) {
+    if (!lastQuery) return
+    // Si el evento es de otra bodega y el query filtra por una bodega
+    // específica, no refrescar.
+    if (
+      event.bodegaId &&
+      lastQuery.bodegaId &&
+      event.bodegaId !== lastQuery.bodegaId
+    ) {
+      return
+    }
+    await this.recargarSilencioso()
+  },
+
+  /**
+   * Handler para los eventos realtime `producto.creado`,
+   * `producto.actualizado` y `producto.eliminado`.
+   *
+   * Estrategia: refetch silencioso del back con el último query. Si
+   * el evento es de la bodega que está mirando el usuario, la lista
+   * se re-sincroniza. Si es de otra, ignora.
+   */
+  async handleProductoCambiado(event: { bodegaId: string | null }) {
+    if (!lastQuery) return
+    if (
+      event.bodegaId &&
+      lastQuery.bodegaId &&
+      event.bodegaId !== lastQuery.bodegaId
+    ) {
+      return
+    }
+    await this.recargarSilencioso()
   },
 }
 

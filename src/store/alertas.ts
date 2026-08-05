@@ -131,6 +131,44 @@ export const alertasStore = {
   reset() {
     setEstado({ status: 'idle' })
   },
+
+  /**
+   * Handler para el evento realtime `alerta.created`.
+   * Inserta la alerta arriba de la lista si la bodega coincide con la actual
+   * y estamos mostrando solo activas.
+   *
+   * Si la bodega del evento no coincide con la que tiene el usuario cargada,
+   * lo ignora (cada usuario ve solo su bodega activa).
+   */
+  handleAlertaCreada(event: { bodegaId: string | null; payload: AlertaStock }) {
+    if (estado.status !== 'listo') return
+    if (event.bodegaId !== estado.bodegaId) return
+    // Si estamos mostrando solo activas y la nueva ya viene atendida, ignorar
+    if (event.payload.atendida) return
+    // Deduplicar: si ya existe, no insertar
+    if (estado.alertas.some((a) => a.id === event.payload.id)) return
+    setEstado({
+      status: 'listo',
+      bodegaId: estado.bodegaId,
+      alertas: [event.payload, ...estado.alertas],
+    })
+  },
+
+  /**
+   * Handler para el evento realtime `alerta.resolved`.
+   * Saca la alerta de la lista si la estamos mostrando (asumimos
+   * que la vista actual muestra solo activas, que es el default).
+   */
+  handleAlertaResuelta(event: { id: string; bodegaId: string | null }) {
+    if (estado.status !== 'listo') return
+    if (event.bodegaId !== estado.bodegaId) return
+    if (!estado.alertas.some((a) => a.id === event.id)) return
+    setEstado({
+      status: 'listo',
+      bodegaId: estado.bodegaId,
+      alertas: estado.alertas.filter((a) => a.id !== event.id),
+    })
+  },
 }
 
 export function useAlertas() {

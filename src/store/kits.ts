@@ -7,7 +7,33 @@ export type KitItem = {
   id: string
   productoId: string
   cantidad: number
-  producto: { id: string; codigo: string; nombre: string }
+  producto: {
+    id: string
+    codigo: string
+    nombre: string
+    /** Unidad de medida del producto (expuesta por el back en listar/findOne). */
+    unidadMedida?: {
+      id: string
+      abreviatura: string
+      permiteDecimales: boolean
+    }
+  }
+}
+
+export type KitDisponibilidad = 'disponible' | 'parcial' | 'agotado'
+
+export type KitItemConStock = {
+  productoId: string
+  codigo: string
+  nombre: string
+  /** Cantidad que el kit pide de este producto (por unidad de kit). */
+  cantidadKit: number
+  /** Stock actual del producto en la bodega del kit. */
+  stock: number
+  /** Stock mínimo requerido. */
+  stockMinimo: number
+  /** Unidad de medida del producto (abreviatura). */
+  unidad: string | null
 }
 
 export type Kit = {
@@ -18,6 +44,11 @@ export type Kit = {
   bodegaId: string
   activo: boolean
   items: KitItem[]
+  /** Calculado por el back en listar(): estado del kit según stock. */
+  disponibilidad?: {
+    estado: KitDisponibilidad
+    items: KitItemConStock[]
+  }
 }
 
 export type CreateKitInput = {

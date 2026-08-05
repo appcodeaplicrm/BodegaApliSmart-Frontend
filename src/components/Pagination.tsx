@@ -17,6 +17,10 @@ type PaginationProps = {
   pageSizeOptions?: number[]
   /** Si es true, oculta el selector de pageSize */
   hidePageSize?: boolean
+  /** Si es true, muestra el "Mostrando X-Y de Z" del propio componente. Default: true */
+  showRange?: boolean
+  /** Si es true, oculta el border-top y el fondo (para embeber dentro de otros containers). Default: false */
+  embedded?: boolean
   /** Disabled (ej: mientras carga) */
   disabled?: boolean
 }
@@ -40,6 +44,8 @@ export function Pagination({
   onPageSizeChange,
   pageSizeOptions = [10, 20, 50, 100],
   hidePageSize = false,
+  showRange = true,
+  embedded = false,
   disabled = false,
 }: PaginationProps) {
   if (total === 0) return null
@@ -59,14 +65,22 @@ export function Pagination({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-border bg-muted/20">
-      {/* Izquierda: "Mostrando X-Y de Z" */}
-      <div
-        className="text-[11px] text-muted-foreground tracking-wider uppercase"
-        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-      >
-        Mostrando {first}-{last} de {total}
-      </div>
+    <div
+      className={
+        embedded
+          ? 'flex flex-wrap items-center justify-between gap-3 py-2'
+          : 'flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-border bg-muted/20'
+      }
+    >
+      {/* Izquierda: "Mostrando X-Y de Z" (opcional, el padre puede mostrarlo) */}
+      {showRange && (
+        <div
+          className="text-[11px] text-muted-foreground tracking-wider uppercase"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          Mostrando {first}-{last} de {total}
+        </div>
+      )}
 
       {/* Centro: botones de página */}
       <div className="flex items-center gap-1">

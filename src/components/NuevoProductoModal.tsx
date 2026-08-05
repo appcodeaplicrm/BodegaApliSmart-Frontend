@@ -13,6 +13,7 @@ import {
   Upload,
   Plus,
   MapPin,
+  CheckCircle2,
 } from 'lucide-react'
 import {
   catalogosService,
@@ -120,6 +121,43 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
       if (!unidadMedidaId) setUnidadMedidaId(unidadesState.unidades[0].id)
     }
   }, [stockInicialUnidadId, unidadMedidaId, unidadesState])
+
+  /**
+   * Sincronizar la unidad del Stock Inicial con la Unidad Base.
+   *
+   * Reglas:
+   *  - Si el usuario cambia la Unidad Base y la unidad del Stock Inicial
+   *    todavía coincide con la unidad base ANTERIOR (o sea, nunca fue
+   *    personalizada), se actualiza a la nueva.
+   *  - Si el usuario había elegido una unidad distinta para el Stock
+   *    Inicial, NO se toca (respeta la decisión — probablemente está
+   *    cargando "5 rollos" que se convierten a metros).
+   *  - El stock inicial ya fue modificado (no es 0) → tampoco se toca
+   *    (asumimos que el usuario ya empezó a cargar y respetamos).
+   *
+   * Usa una ref para recordar cuál era la unidad base anterior y así
+   * poder comparar sin disparar el effect en cada render.
+   */
+  const prevUnidadMedidaIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevUnidadMedidaIdRef.current
+    // Primer render: solo registrar la unidad actual sin hacer nada
+    if (prev === null) {
+      prevUnidadMedidaIdRef.current = unidadMedidaId
+      return
+    }
+    // Si no cambió, no hacer nada
+    if (prev === unidadMedidaId) return
+    // Si la unidad del stock inicial coincide con la VIEJA unidad base
+    // (o sea, no fue personalizada), sincronizar a la nueva.
+    if (
+      stockInicialUnidadId === prev &&
+      stockInicial === 0
+    ) {
+      setStockInicialUnidadId(unidadMedidaId)
+    }
+    prevUnidadMedidaIdRef.current = unidadMedidaId
+  }, [unidadMedidaId, stockInicialUnidadId, stockInicial])
 
   function pickFile(
     tipo: DocUpload['tipo'],
@@ -539,21 +577,25 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
               <DocButton
                 icon={<FileText size={14} className="text-primary" />}
                 label="Ficha Técnica"
+                count={docs.filter((d) => d.tipo === 'FichaTecnica').length}
                 onClick={() => fichaRef.current?.click()}
               />
               <DocButton
                 icon={<Plus size={14} className="text-secondary" />}
                 label="Certificación"
+                count={docs.filter((d) => d.tipo === 'Certificacion').length}
                 onClick={() => certRef.current?.click()}
               />
               <DocButton
                 icon={<FileText size={14} className="text-muted-foreground" />}
                 label="Manual"
+                count={docs.filter((d) => d.tipo === 'Manual').length}
                 onClick={() => manualRef.current?.click()}
               />
               <DocButton
                 icon={<Upload size={14} className="text-muted-foreground" />}
                 label="Foto"
+                count={docs.filter((d) => d.tipo === 'Foto').length}
                 onClick={() => fotoRef.current?.click()}
               />
             </div>
@@ -792,21 +834,45 @@ function Field({
 function DocButton({
   icon,
   label,
+  count,
   onClick,
 }: {
   icon: React.ReactNode
   label: string
+  /** Cuántos archivos de este tipo ya están cargados. Si > 0, se muestra en verde con check. */
+  count: number
   onClick: () => void
 }) {
+  const hasFile = count > 0
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-2 px-3 py-2 bg-card border border-border text-xs text-foreground hover:border-primary/40 transition-colors"
+      className={
+        hasFile
+          ? 'inline-flex items-center justify-between gap-2 px-3 py-2 bg-emerald-500/15 border border-emerald-500/50 text-xs text-emerald-500 hover:border-emerald-500 transition-colors'
+          : 'inline-flex items-center gap-2 px-3 py-2 bg-card border border-border text-xs text-foreground hover:border-primary/40 transition-colors'
+      }
       style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+      title={hasFile ? `${count} archivo(s) cargado(s)` : `Agregar ${label.toLowerCase()}`}
     >
-      {icon}
-      + {label}
+      <span className="inline-flex items-center gap-2">
+        {icon}
+        {hasFile ? label : `+ ${label}`}
+      </span>
+      {hasFile && (
+        <span className="inline-flex items-center gap-1">
+          <CheckCircle2 size={14} className="text-emerald-500" />
+          {count > 1 && (
+            <span
+              className="text-[10px] font-bold"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {count}
+            </span>
+          )}
+        </span>
+      )}
     </button>
   )
 }

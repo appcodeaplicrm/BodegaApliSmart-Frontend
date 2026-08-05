@@ -28,6 +28,10 @@ type ItemDraft = {
   kitNombre: string | null
   cantidadOriginal: number
   cantidad: number
+  /** Unidad del producto (abreviatura) para mostrar al lado del input. */
+  unidadAbreviatura: string
+  /** Si la unidad permite decimales (false = und, par; true = metro, kg). */
+  permiteDecimales: boolean
 }
 
 /**
@@ -119,6 +123,7 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
     const drafts: ItemDraft[] = []
     for (const it of pedidoCompleto.items) {
       if (it.producto) {
+        const um = it.producto.unidadMedida
         drafts.push({
           detalleId: it.id,
           productoId: it.producto.id,
@@ -127,9 +132,12 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
           kitNombre: null,
           cantidadOriginal: Number(it.cantidad),
           cantidad: 0,
+          unidadAbreviatura: um?.abreviatura ?? 'und',
+          permiteDecimales: um?.permiteDecimales ?? false,
         })
       } else if (it.kit) {
         for (const ki of it.kit.items) {
+          const um = ki.producto.unidadMedida
           drafts.push({
             detalleId: it.id,
             productoId: ki.producto.id,
@@ -138,6 +146,8 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
             kitNombre: it.kit.nombre,
             cantidadOriginal: Number(it.cantidad) * Number(ki.cantidad),
             cantidad: 0,
+            unidadAbreviatura: um?.abreviatura ?? 'und',
+            permiteDecimales: um?.permiteDecimales ?? false,
           })
         }
       }
@@ -221,7 +231,7 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Selector de pedido */}
+          {/* Selector de pedido — o display si vino preseleccionado */}
           <div>
             <label
               className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1.5 block"
@@ -229,7 +239,25 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
             >
               Pedido original
             </label>
-            {pedidosState.status === 'cargando' || pedidosState.status === 'idle' ? (
+            {pedidoInicialId ? (
+              // Vino preseleccionado desde un botón externo: solo display,
+              // no le mostramos el select para que no pueda cambiarlo.
+              <div
+                className="w-full px-3 py-2 bg-muted/50 border border-border text-sm text-foreground"
+                style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+              >
+                {pedidosEntregados.find((p) => p.id === pedidoInicialId)?.codigo ??
+                  pedidoCompleto?.codigo ??
+                  'Cargando…'}{' '}
+                {pedidosEntregados.find((p) => p.id === pedidoInicialId)?.createdAtLabel ??
+                  (pedidoCompleto
+                    ? new Date(pedidoCompleto.createdAt).toLocaleString('es-CO', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      })
+                    : '')}
+              </div>
+            ) : pedidosState.status === 'cargando' || pedidosState.status === 'idle' ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 size={14} className="animate-spin" /> Cargando pedidos…
               </div>
@@ -306,22 +334,30 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
                         className="text-[10px] text-muted-foreground mt-1"
                         style={{ fontFamily: "'JetBrains Mono', monospace" }}
                       >
-                        Pedido original: {it.cantidadOriginal}
+                        Pedido original: {it.cantidadOriginal} {it.unidadAbreviatura}
                       </div>
                     </div>
-                    <input
-                      type="number"
-                      min={0}
-                      max={it.cantidadOriginal}
-                      step="0.001"
-                      value={it.cantidad}
-                      onChange={(e) => setCantidad(idx, Number(e.target.value))}
-                      className="w-20 px-2 py-1.5 bg-muted border border-border text-sm text-right outline-none focus:border-primary/60"
-                      style={{
-                        borderRadius: '0.25rem',
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}
-                    />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <input
+                        type="number"
+                        min={0}
+                        max={it.cantidadOriginal}
+                        step={it.permiteDecimales ? '0.001' : '1'}
+                        value={it.cantidad}
+                        onChange={(e) => setCantidad(idx, Number(e.target.value))}
+                        className="w-20 px-2 py-1.5 bg-muted border border-border text-sm text-right outline-none focus:border-primary/60"
+                        style={{
+                          borderRadius: '0.25rem',
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}
+                      />
+                      <span
+                        className="text-xs text-muted-foreground min-w-[3rem]"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        {it.unidadAbreviatura}
+                      </span>
+                    </div>
                   </li>
                 ))}
               </ul>

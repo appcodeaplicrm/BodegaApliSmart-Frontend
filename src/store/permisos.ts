@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { api, ApiError } from '../lib/api'
+import { useAuth } from './auth'
 import type { ModulePermissionMap } from './auth'
 
 /**
@@ -103,7 +104,12 @@ export const ACCION_LABELS: Record<Accion, string> = {
 
 export type Permiso = string
 
-export type RolKey = 'admin' | 'bodeguero' | 'operador' | 'tecnico' | string
+/**
+ * Key del rol. Antes era una unión cerrada; ahora cualquier string
+ * porque los tenants crean sus propios roles. Las únicas keys
+ * garantizadas son `admin` y `superadmin` (sistema).
+ */
+export type RolKey = string
 
 export type ApiRol = {
   id: string
@@ -111,6 +117,8 @@ export type ApiRol = {
   nombre: string
   descripcion: string
   esSistema: boolean
+  /** Tenant al que pertenece el rol. `null` = rol del sistema (admin/superadmin). */
+  adminId: string | null
   createdAt: string
   updatedAt: string
   usuariosCount: number
@@ -124,6 +132,8 @@ export type Rol = {
   descripcion: string
   permisos: Permiso[]
   esSistema: boolean
+  /** Tenant al que pertenece el rol. `null` = rol del sistema. */
+  adminId: string | null
   usuariosCount: number
 }
 
@@ -201,6 +211,7 @@ function normalizarRol(r: ApiRol): Rol {
     nombre: r.nombre,
     descripcion: r.descripcion,
     esSistema: r.esSistema,
+    adminId: r.adminId ?? null,
     usuariosCount: r.usuariosCount,
     permisos: r.permisos,
   }
@@ -301,7 +312,21 @@ export const permisosStore = {
 }
 
 export function usePermisos() {
-  return useSyncExternalStore(permisosStore.subscribe, permisosStore.getSnapshot, permisosStore.getSnapshot)
+  const snap = useSyncExternalStore(permisosStore.subscribe, permisosStore.getSnapshot, permisosStore.getSnapshot)
+  // El back ya filtra por tenant en `/roles`, pero como defensa en
+  // profundidad filtramos también del lado del front: solo devolvemos
+  // los roles del sistema (`adminId === null`) o los del tenant activo.
+  // Esto evita que un cambio futuro del back que olvide el filtro
+  // exponga roles de OTRO tenant en el dropdown del modal.
+  const auth = useAuth()
+  const tenantAdminId =
+    auth.status === 'autenticado' ? auth.sesion.usuario.id : null
+  const filtrados = tenantAdminId
+    ? snap.roles.filter(
+        (r) => r.adminId === null || r.adminId === tenantAdminId,
+      )
+    : snap.roles.filter((r) => r.adminId === null)
+  return { ...snap, roles: filtrados }
 }
 
 // ─────────────────────────────────────────────

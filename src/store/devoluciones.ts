@@ -117,7 +117,11 @@ export type PendientePorPedido = {
   }>
 }
 
-function toListItem(d: Devolucion): DevolucionListItem {
+/**
+ * Convierte una Devolución (con includes) en un DevolucionListItem.
+ * Exportado para que el handler realtime pueda usarlo al insertar.
+ */
+export function toListItem(d: Devolucion): DevolucionListItem {
   const total = d.items.length
   const recibidos = d.items.filter((it) => it.estado === 'recibido').length
   const rechazados = d.items.filter((it) => it.estado === 'rechazado').length
@@ -179,6 +183,11 @@ export type PageResult<T> = {
 
 let estado: Estado = { status: 'idle' }
 let cacheSnapshot: Estado = estado
+/**
+ * Cache del último query usado en `cargarPaginado`. Sirve para que
+ * los handlers realtime puedan hacer un refetch silencioso.
+ */
+let lastQuery: DevolucionesQuery | null = null
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -229,16 +238,27 @@ export const devolucionesStore = {
 
   /**
    * Trae los items pendientes de devolución por pedido Entregado.
-   * Si se pasa `operadorId`, filtra a los pedidos de ese operador.
+   *
+   * Filtros opcionales:
+   *  - `bodegaId`: filtra a los pedidos de esa bodega (recomendado
+   *    para que el admin vea solo lo de la bodega activa).
+   *  - `operadorId`: filtra a los pedidos de ese operador.
    */
-  async cargarPendientes(operadorId?: string): Promise<PendientePorPedido[]> {
-    const path = operadorId
-      ? `/devoluciones/pendientes-por-pedido?operadorId=${encodeURIComponent(operadorId)}`
-      : '/devoluciones/pendientes-por-pedido'
-    return api.get<PendientePorPedido[]>(path)
+  async cargarPendientes(
+    operadorId?: string,
+    bodegaId?: string,
+  ): Promise<PendientePorPedido[]> {
+    const params = new URLSearchParams()
+    if (operadorId) params.set('operadorId', operadorId)
+    if (bodegaId) params.set('bodegaId', bodegaId)
+    const qs = params.toString()
+    return api.get<PendientePorPedido[]>(
+      `/devoluciones/pendientes-por-pedido${qs ? `?${qs}` : ''}`,
+    )
   },
 
   async cargarPaginado(query: DevolucionesQuery): Promise<PageResult<DevolucionListItem>> {
+    lastQuery = query
     setEstado({ status: 'cargando' })
     try {
       const params = new URLSearchParams()
@@ -355,6 +375,86 @@ export const devolucionesStore = {
 
   reset() {
     setEstado({ status: 'idle' })
+  },
+
+  /**
+   * Handler para el evento realtime `devolucion.creada`.
+   *
+   * Inserta la devolución arriba de la lista.
+   */
+  handleDevolucionCreada(args: {
+    bodegaId: string | null
+    payload: Devolucion
+    currentBodegaId?: string
+  }) {
+    if (estado.status !== 'listo') return
+    if (args.currentBodegaId && args.bodegaId !== args.currentBodegaId) return
+    if (estado.devoluciones.some((d) => d.id === args.payload.id)) return
+    const nueva = toListItem(args.payload)
+    setEstado({
+      status: 'listo',
+      devoluciones: [nueva, ...estado.devoluciones],
+      total: estado.total + 1,
+      page: estado.page,
+      pageSize: estado.pageSize,
+      totalPages: Math.ceil((estado.total + 1) / estado.pageSize),
+    })
+  },
+
+  /**
+   * Handler para el evento realtime `devolucion.cambiada`.
+   *
+   * Estrategia: refetch silencioso de la página actual con el último
+   * query. Robusto contra cualquier discrepancia (ej: cambios en
+   * items, recibidaPor, etc. que el evento no trae).
+   */
+  handleDevolucionCambiada(event: {
+    id: string
+    codigo: string
+    estadoAnterior: string
+    estadoNuevo: string
+    bodegaId: string | null
+  }) {
+    if (!lastQuery) return
+    if (
+      event.bodegaId &&
+      lastQuery.bodegaId &&
+      event.bodegaId !== lastQuery.bodegaId
+    ) {
+      return
+    }
+    void this.recargarSilencioso()
+  },
+
+  /**
+   * Refetch silencioso: igual a `cargarPaginado` pero NO cambia el
+   * status a 'cargando' (no parpadea la UI).
+   */
+  async recargarSilencioso(): Promise<void> {
+    if (!lastQuery) return
+    try {
+      const params = new URLSearchParams()
+      if (lastQuery.bodegaId) params.set('bodegaId', lastQuery.bodegaId)
+      if (lastQuery.estado) params.set('estado', lastQuery.estado)
+      params.set('page', String(lastQuery.page))
+      params.set('pageSize', String(lastQuery.pageSize))
+      const result = await api.get<PageResult<Devolucion>>(
+        `/devoluciones?${params.toString()}`,
+      )
+      const devoluciones = result.data.map(toListItem)
+      if (estado.status === 'listo') {
+        setEstado({
+          status: 'listo',
+          devoluciones,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          totalPages: result.totalPages,
+        })
+      }
+    } catch {
+      // Silencioso
+    }
   },
 }
 

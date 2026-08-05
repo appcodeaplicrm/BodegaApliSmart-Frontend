@@ -158,6 +158,37 @@ export const movimientosStore = {
   reset() {
     setEstado({ status: 'idle' })
   },
+
+  /**
+   * Handler para el evento realtime `movimiento.created`.
+   *
+   * Como la lista es paginada, solo insertamos arriba si la página
+   * actual es 1 (para no romper la paginación). Si está en otra
+   * página, no tocamos nada: el front hace refetch manual si quiere
+   * ver el nuevo.
+   *
+   * Si el query está filtrado por bodega y el evento es de otra
+   * bodega, lo ignoramos.
+   */
+  handleMovimientoCreado(args: {
+    bodegaId: string | null
+    payload: Movimiento
+    currentBodegaId?: string
+  }) {
+    if (estado.status !== 'listo') return
+    if (args.currentBodegaId && args.bodegaId !== args.currentBodegaId) return
+    if (estado.page !== 1) return
+    // Deduplicar
+    if (estado.movimientos.some((m) => m.id === args.payload.id)) return
+    setEstado({
+      status: 'listo',
+      movimientos: [args.payload, ...estado.movimientos].slice(0, estado.pageSize),
+      total: estado.total + 1,
+      page: estado.page,
+      pageSize: estado.pageSize,
+      totalPages: Math.ceil((estado.total + 1) / estado.pageSize),
+    })
+  },
 }
 
 export function useMovimientos() {

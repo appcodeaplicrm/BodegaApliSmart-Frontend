@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import {
   usuariosStore,
-  type RolUsuario,
   type EstadoUsuario,
 } from '../store/usuarios'
 import { usePermisos, permisosStore } from '../store/permisos'
@@ -25,12 +24,13 @@ type CrearUsuarioModalProps = {
   onCreated?: (usuario: { id: string; nombre: string; email: string }) => void
 }
 
-const ROLES_PREDEFINIDOS: { key: RolUsuario; label: string }[] = [
-  { key: 'admin', label: 'Administrador' },
-  { key: 'bodeguero', label: 'Bodeguero' },
-  { key: 'operador', label: 'Operador' },
-  { key: 'tecnico', label: 'Técnico' },
-]
+/**
+ * Keys de roles globales (reservados del sistema) que NO se deben
+ * ofrecer al crear usuarios no-admin. El rol `admin` lo tiene el dueño
+ * del tenant; no se asigna a otros users. `superadmin` es cross-tenant
+ * y tampoco aparece acá.
+ */
+const ROLES_RESERVADOS = new Set(['admin', 'superadmin'])
 
 const ESTADOS: EstadoUsuario[] = ['Activo', 'Inactivo']
 
@@ -43,7 +43,7 @@ export function CrearUsuarioModal({ onClose, onCreated }: CrearUsuarioModalProps
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmar, setConfirmar] = useState('')
-  const [rolKey, setRolKey] = useState<RolUsuario | string>('operador')
+  const [rolKey, setRolKey] = useState<string>('')
   const [estado, setEstado] = useState<EstadoUsuario>('Activo')
   const [showPwd, setShowPwd] = useState(false)
   const [error, setError] = useState('')
@@ -62,19 +62,18 @@ export function CrearUsuarioModal({ onClose, onCreated }: CrearUsuarioModalProps
   const bodegas = bodegasState.status === 'listo' ? bodegasState.bodegas : []
   const bodegaActiva = bodegas.find((b) => b.id === activaId)
 
-  // Roles disponibles: predefinidos + custom del store de permisos
-  const rolesDisponibles = (() => {
-    const set = new Map<string, { key: string; nombre: string }>()
-    for (const r of ROLES_PREDEFINIDOS) {
-      set.set(r.key, { key: r.key, nombre: r.label })
+  // Roles disponibles: solo los CUSTOM del tenant (definidos desde
+  // Roles y Permisos). Excluimos admin y superadmin (son del sistema).
+  const rolesDisponibles = roles
+    .filter((r) => !ROLES_RESERVADOS.has(r.key))
+    .map((r) => ({ key: r.key, nombre: r.nombre }))
+
+  // Default: el primer rol disponible (si hay)
+  useEffect(() => {
+    if (!rolKey && rolesDisponibles.length > 0) {
+      setRolKey(rolesDisponibles[0].key)
     }
-    for (const r of roles) {
-      if (!set.has(r.key)) {
-        set.set(r.key, { key: r.key, nombre: r.nombre })
-      }
-    }
-    return Array.from(set.values())
-  })()
+  }, [rolKey, rolesDisponibles.length])
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -112,6 +111,12 @@ export function CrearUsuarioModal({ onClose, onCreated }: CrearUsuarioModalProps
     }
     if (!activaId) {
       setError('No hay una bodega activa. Seleccioná una bodega antes de crear usuarios.')
+      return
+    }
+    if (!rolKey) {
+      setError(
+        'No hay roles disponibles. Creá al menos un rol en "Roles y Permisos" antes de asignar usuarios.',
+      )
       return
     }
 

@@ -363,11 +363,15 @@ export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps
                     className={inputClass}
                     disabled={guardando}
                   >
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.key}>
-                        {r.nombre}
-                      </option>
-                    ))}
+                    {roles
+                      // Excluimos los roles reservados del sistema
+                      // (admin, superadmin) del dropdown de edición.
+                      .filter((r) => r.key !== 'admin' && r.key !== 'superadmin')
+                      .map((r) => (
+                        <option key={r.id} value={r.key}>
+                          {r.nombre}
+                        </option>
+                      ))}
                   </select>
                 </Field>
                 <Field label="Estado" required>

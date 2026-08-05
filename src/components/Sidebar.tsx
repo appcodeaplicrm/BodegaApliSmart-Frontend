@@ -146,7 +146,7 @@ const general: NavItem[] = [
         permiso: 'tecnicos.herramientas.ver',
       },
       {
-        key: 'alertas',
+        key: 'alertas-kit',
         path: '/tecnicos/alertas',
         label: 'Alertas de Kit',
         icon: BellRing,
@@ -282,6 +282,9 @@ export function Sidebar({ active, subKey, onLogout }: SidebarProps) {
   // El item activo es el que matchea la URL actual
   const viewActivo = active ?? 'dashboard'
   const subActivo = subKey
+  // Para saber si estamos "bajo" un item con children (ej: /tecnicos/...)
+  // construimos el path completo de la URL.
+  const pathActual = subActivo ? `/${viewActivo}/${subActivo}` : `/${viewActivo}`
 
   const sesion = auth.status === 'autenticado' ? auth.sesion : null
   const usuario = sesion?.usuario ?? null
@@ -404,8 +407,15 @@ export function Sidebar({ active, subKey, onLogout }: SidebarProps) {
             const isActive = viewActivo === item.key
             const hasChildren = !!item.children?.length
             const isOpen = !!openMenus[item.label]
+            // El padre se ilumina SOLO si la URL actual está bajo su path.
+            // Esto evita que un sub-item con path absoluto (ej: /devoluciones
+            // dentro de Técnicos con path /tecnicos) ilumine al padre cuando
+            // la URL real es /devoluciones (top-level).
+            //
+            // La condición: `pathActual` empieza con `item.path + '/'`
+            //              o `pathActual === item.path`
             const childActive = hasChildren
-              ? item.children!.some((c) => c.key === viewActivo)
+              ? pathActual === item.path || pathActual.startsWith(item.path + '/')
               : false
 
             return (
@@ -415,11 +425,11 @@ export function Sidebar({ active, subKey, onLogout }: SidebarProps) {
                   title={collapsed ? item.label : undefined}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
                     isOpen && childActive
-                      ? 'bg-primary/20 text-primary'
+                      ? 'bg-primary/25 text-white'
                       : isOpen
                         ? 'bg-muted text-foreground'
                         : isActive || childActive
-                          ? 'bg-primary/15 text-primary'
+                          ? 'bg-primary/20 text-white font-semibold'
                           : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   } ${collapsed ? 'justify-center' : ''}`}
                   style={{ borderRadius: '0.25rem' }}
@@ -467,14 +477,19 @@ export function Sidebar({ active, subKey, onLogout }: SidebarProps) {
                       <ul className="ml-3 mt-1 mb-1 pl-3 border-l border-border space-y-0.5">
                         {item.children!.map((sub) => {
                           const SubIcon = sub.icon
-                          const isSubActive = subActivo === sub.key
+                          // El sub-item se ilumina si su path matchea el path actual.
+                          // Soporta paths absolutos (ej: /devoluciones) y relativos
+                          // al padre (ej: /tecnicos/solicitudes).
+                          const isSubActive =
+                            sub.path === pathActual ||
+                            pathActual.startsWith(sub.path + '/')
                           return (
                             <li key={sub.key}>
                               <button
                                 onClick={() => irA(sub.path)}
                                 className={`w-full flex items-center gap-2.5 px-2 py-1.5 text-[13px] transition-colors ${
                                   isSubActive
-                                    ? 'bg-primary/10 text-primary'
+                                    ? 'bg-primary/15 text-white font-semibold'
                                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                                 }`}
                                 style={{ borderRadius: '0.25rem' }}

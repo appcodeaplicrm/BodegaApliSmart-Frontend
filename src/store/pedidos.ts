@@ -60,6 +60,13 @@ export type PedidoItem = {
     nombre: string
     /** Solo viene en listar/findOne. Útil para el PDF. */
     documentos?: Array<{ id: string; url: string; mimeType: string }>
+    /** Traído por el back en findOne (con include producto: true). */
+    unidadMedida?: {
+      id: string
+      nombre: string
+      abreviatura: string
+      permiteDecimales: boolean
+    }
   } | null
   kit: {
     id: string
@@ -72,7 +79,17 @@ export type PedidoItem = {
       id: string
       productoId: string
       cantidad: number
-      producto: { id: string; codigo: string; nombre: string }
+      producto: {
+        id: string
+        codigo: string
+        nombre: string
+        unidadMedida?: {
+          id: string
+          nombre: string
+          abreviatura: string
+          permiteDecimales: boolean
+        }
+      }
     }>
   } | null
   /** Filas de entrega (1 por producto concreto del pedido). */
@@ -170,7 +187,12 @@ function formatFecha(iso: string): string {
   })
 }
 
-function toListItem(p: Pedido): PedidoListItem {
+/**
+ * Convierte un Pedido (con includes) en un PedidoListItem (forma liviana
+ * para listas). Exportado para que el handler realtime pueda usarlo al
+ * insertar un pedido nuevo arriba de la lista.
+ */
+export function toListItem(p: Pedido): PedidoListItem {
   // Resumen del wizard de entrega (sumamos todos los EntregaItem del pedido)
   const allEntregaItems = p.items.flatMap((it) => it.entregaItems ?? [])
   const entregaResumen =
@@ -315,6 +337,13 @@ type Estado =
 
 let estado: Estado = { status: 'idle' }
 let cacheSnapshot: Estado = estado
+/**
+ * Cache del último query usado en `cargarPaginado`. Sirve para que
+ * los handlers realtime puedan hacer un refetch silencioso cuando
+ * llega un cambio (ej: estado de pedido cambió) y re-sincronizar la
+ * lista sin que el componente tenga que saber qué filtros se usaron.
+ */
+let lastQuery: PedidosQuery | null = null
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -366,15 +395,10 @@ export const pedidosStore = {
 
   /** Carga una página de pedidos con filtros opcionales. */
   async cargarPaginado(query: PedidosQuery): Promise<PageResult<PedidoListItem>> {
+    lastQuery = query
     setEstado({ status: 'cargando' })
     try {
-      const params = new URLSearchParams()
-      if (query.bodegaId) params.set('bodegaId', query.bodegaId)
-      if (query.estado) params.set('estado', query.estado)
-      if (query.operadorId) params.set('operadorId', query.operadorId)
-      params.set('page', String(query.page))
-      params.set('pageSize', String(query.pageSize))
-      const result = await api.get<PageResult<Pedido>>(`/pedidos?${params.toString()}`)
+      const result = await this.fetchPaginado(query)
       const pedidos = result.data.map(toListItem)
       const pageResult: PageResult<PedidoListItem> = {
         data: pedidos,
@@ -397,6 +421,45 @@ export const pedidosStore = {
       setEstado({ status: 'error', mensaje })
       throw err
     }
+  },
+
+  /**
+   * Refetch silencioso: igual a `cargarPaginado` pero NO cambia el
+   * status a 'cargando' (la lista sigue mostrándose, no parpadea).
+   * Usado por los handlers realtime para re-sincronizar después de
+   * un cambio.
+   */
+  async recargarSilencioso(): Promise<void> {
+    if (!lastQuery) return
+    try {
+      const result = await this.fetchPaginado(lastQuery)
+      const pedidos = result.data.map(toListItem)
+      // Solo actualizar si el status sigue siendo 'listo' (no pisar
+      // un 'cargando' o 'error' que haya puesto el usuario).
+      if (estado.status === 'listo') {
+        setEstado({
+          status: 'listo',
+          pedidos,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          totalPages: result.totalPages,
+        })
+      }
+    } catch {
+      // Silencioso: si falla, el próximo GET manual del usuario lo arregla
+    }
+  },
+
+  /** Helper interno: hace el GET al back con el query dado. */
+  async fetchPaginado(query: PedidosQuery): Promise<PageResult<Pedido>> {
+    const params = new URLSearchParams()
+    if (query.bodegaId) params.set('bodegaId', query.bodegaId)
+    if (query.estado) params.set('estado', query.estado)
+    if (query.operadorId) params.set('operadorId', query.operadorId)
+    params.set('page', String(query.page))
+    params.set('pageSize', String(query.pageSize))
+    return api.get<PageResult<Pedido>>(`/pedidos?${params.toString()}`)
   },
 
   /** Recarga la página actual (helper). */
@@ -428,6 +491,87 @@ export const pedidosStore = {
 
   reset() {
     setEstado({ status: 'idle' })
+  },
+
+  /**
+   * Handler para el evento realtime `pedido.creado`.
+   *
+   * Inserta el pedido arriba de la lista (sin importar la página).
+   * Si la lista no está cargada o el pedido ya está, lo ignora.
+   *
+   * Si el evento es de otra bodega a la que está mirando el usuario,
+   * también lo ignora.
+   */
+  handlePedidoCreado(args: {
+    bodegaId: string | null
+    payload: Pedido
+    /** Bodega activa del usuario (la que tiene cargada la lista). */
+    currentBodegaId?: string
+  }) {
+    if (estado.status !== 'listo') return
+    if (args.currentBodegaId && args.bodegaId !== args.currentBodegaId) return
+    // Deduplicar (caso borde: el user creó el pedido y se lo emitimos a él mismo)
+    if (estado.pedidos.some((p) => p.id === args.payload.id)) return
+    const nuevo = toListItem(args.payload)
+    setEstado({
+      status: 'listo',
+      pedidos: [nuevo, ...estado.pedidos],
+      total: estado.total + 1,
+      page: estado.page,
+      pageSize: estado.pageSize,
+      totalPages: Math.ceil((estado.total + 1) / estado.pageSize),
+    })
+  },
+
+  /**
+   * Handler para el evento realtime `pedido.estado-cambiado`.
+   *
+   * Estrategia: hacer un refetch silencioso de la página actual con el
+   * último query que se usó. Esto SIEMPRE refleja el estado real del
+   * back (incluyendo cambios en otros campos que el evento no trae,
+   * como `aprobadaAt`, `aprobadaPor`, etc.).
+   *
+   * Ventaja sobre el update in-place: robusto contra cualquier
+   * discrepancia entre el payload del evento y la realidad del back.
+   * Desventaja: hace un GET extra. Para listas chicas (10-20 items)
+   * es despreciable.
+   *
+   * Si el evento es de una bodega distinta a la del query, lo ignora
+   * (no es relevante para el user).
+   */
+  handleEstadoCambiado(event: {
+    id: string
+    codigo: string
+    estadoAnterior: string
+    estadoNuevo: string
+    bodegaId: string | null
+  }) {
+    if (!lastQuery) return
+    // Si el evento es de otra bodega y el query filtra por una bodega
+    // específica, no refrescar (no afecta a esta vista).
+    if (
+      event.bodegaId &&
+      lastQuery.bodegaId &&
+      event.bodegaId !== lastQuery.bodegaId
+    ) {
+      return
+    }
+    // Refetch silencioso. Si falla, no importa.
+    void this.recargarSilencioso()
+  },
+
+  /**
+   * Handler para `entrega-item.cambiado`.
+   *
+   * Como `entregaResumen` se deriva del estado del pedido, no podemos
+   * actualizar el item in-place sin recargar el pedido entero.
+   * Solución simple: marcar el pedido como "stale" para que la próxima
+   * vez que el front lo abra, recargue con detalle. Por ahora no
+   * recargamos la lista automáticamente — el usuario hace pull-to-refresh.
+   */
+  handleEntregaItemCambiado(_event: { pedidoId: string; bodegaId: string | null }) {
+    // No-op por ahora (ver doc arriba). La próxima vez que el usuario
+    // abra el detalle, verá los items actualizados.
   },
 }
 

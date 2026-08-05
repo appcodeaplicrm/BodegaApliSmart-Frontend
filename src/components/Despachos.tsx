@@ -12,6 +12,7 @@ import {
 import { AccionOrdenModal } from './AccionOrdenModal'
 import { OrdenDetalleModal } from './OrdenDetalleModal'
 import { Pagination } from './Pagination'
+import { PageHeader } from './PageHeader'
 
 /**
  * Pantalla Despachos (vista del BODEGUERO / ADMIN).
@@ -103,37 +104,14 @@ export function Despachos() {
   }
 
   return (
-    <>
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-        <div className="p-8 space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-muted flex items-center justify-center shrink-0 mt-1">
-                <Truck size={20} className="text-primary" />
-              </div>
-              <div>
-                <h1
-                  className="text-4xl uppercase text-foreground leading-none"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-                >
-                  Despachos
-                </h1>
-                <p
-                  className="mt-1 text-sm text-muted-foreground"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}
-                >
-                  Bandeja de entradas — resolvé las solicitudes de la bodega
-                </p>
-                <div
-                  className="mt-1 text-[10px] text-muted-foreground tracking-widest uppercase"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  Rol: {usuarioRol} · {usuarioNombre}
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <PageHeader
+        title="Despachos"
+        subtitle={`STOCKPRO · ${usuarioRol.toUpperCase()} · ${usuarioNombre}`}
+      />
 
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <div className="space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatTile
@@ -274,7 +252,7 @@ export function Despachos() {
       {detalle && (
         <OrdenDetalleModal pedido={detalle} onClose={() => setDetalle(null)} />
       )}
-    </>
+    </div>
   )
 }
 

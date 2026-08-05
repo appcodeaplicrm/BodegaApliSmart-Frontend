@@ -90,6 +90,7 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
         categoriaNombre: categorias.find((c) => c.id === categoriaId)?.nombre ?? '',
         marcaId: marcaId || undefined,
         unidadMedidaId,
+        bodegaId: bodegaId ?? undefined,
         precio,
         stockMinimo,
         stockMaximo: stockMaximo > 0 ? stockMaximo : undefined,

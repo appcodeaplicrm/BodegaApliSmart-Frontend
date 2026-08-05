@@ -1,14 +1,16 @@
 import { useSyncExternalStore } from 'react'
 import { api, ApiError } from '../lib/api'
 
-export type RolUsuario = 'admin' | 'bodeguero' | 'operador' | 'tecnico'
-
-export const ROL_LABELS: Record<RolUsuario, string> = {
-  admin: 'ADMIN',
-  bodeguero: 'BODEGUERO',
-  operador: 'OPERADOR',
-  tecnico: 'TÉCNICO',
-}
+/**
+ * Key del rol que el back asigna al usuario. Antes era una unión cerrada
+ * (admin/bodeguero/operador/tecnico) porque esos 4 roles se creaban
+ * globalmente en el seed. Ahora cada tenant define sus propios roles
+ * desde la pantalla "Roles y Permisos", así que la key es libre.
+ *
+ * El back igual expone los roles globales `admin` y `superadmin`
+ * (siguen siendo del sistema) pero NO crea más allá de eso.
+ */
+export type RolUsuario = string
 
 export type EstadoUsuario = 'Activo' | 'Inactivo'
 
@@ -28,13 +30,14 @@ export type ApiUsuario = {
 
 /**
  * Shape que consume el front (legacy). Es un subset de ApiUsuario
- * con tipos adaptados (rol como RolUsuario, createdAt como ms epoch).
+ * con tipos adaptados (rol como RolUsuario libre, createdAt como ms epoch).
  */
 export type Usuario = {
   id: string
   nombre: string
   email: string
   rol: RolUsuario
+  rolNombre: string
   estado: EstadoUsuario
   bodegaId: string | null
   bodegaNombre: string | null
@@ -46,7 +49,8 @@ function fromApi(u: ApiUsuario): Usuario {
     id: u.id,
     nombre: u.nombre,
     email: u.email,
-    rol: (u.rol ?? 'operador') as RolUsuario,
+    rol: (u.rol ?? '') as RolUsuario,
+    rolNombre: u.rolNombre ?? '',
     estado: u.estado,
     bodegaId: u.bodegaId,
     bodegaNombre: u.bodegaNombre,
@@ -243,6 +247,17 @@ export const usuariosStore = {
   /** Elimina un usuario en el back. */
   async eliminar(id: string): Promise<void> {
     await api.delete(`/usuarios/${id}`)
+  },
+
+  /**
+   * Cambia la contraseña de un usuario.
+   * Si el caller es el mismo usuario, debe pasar `actual` también.
+   */
+  async cambiarPassword(
+    id: string,
+    input: { nueva: string; actual?: string },
+  ): Promise<{ ok: true }> {
+    return api.patch<{ ok: true }>(`/usuarios/${id}/password`, input)
   },
 
   /**

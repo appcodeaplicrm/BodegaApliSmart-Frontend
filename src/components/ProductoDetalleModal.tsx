@@ -404,19 +404,21 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
                         >
                           <Download size={14} />
                         </a>
-                        <button
-                          type="button"
-                          onClick={() => handleEliminarDoc(d.id)}
-                          disabled={deletingId === d.id}
-                          className="p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                          aria-label="Eliminar"
-                        >
-                          {deletingId === d.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <X size={14} />
-                          )}
-                        </button>
+                        {puedeEliminar && (
+                          <button
+                            type="button"
+                            onClick={() => handleEliminarDoc(d.id)}
+                            disabled={deletingId === d.id}
+                            className="p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                            aria-label="Eliminar"
+                          >
+                            {deletingId === d.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <X size={14} />
+                            )}
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>

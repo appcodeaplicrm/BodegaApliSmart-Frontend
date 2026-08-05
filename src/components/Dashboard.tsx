@@ -5,7 +5,7 @@ import { useBodegas, bodegasStore } from '../store/bodegas'
 import { useBodegaActiva, bodegaActivaStore } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
 import { DashboardView } from './DashboardView'
-import { Inventario } from './Inventario'
+import { InventarioV2 } from './InventarioV2'
 import { Despachos } from './Despachos'
 import { Ordenes } from './Ordenes'
 import { Devoluciones } from './Devoluciones'
@@ -104,7 +104,7 @@ export function Dashboard({ view = 'dashboard', onExit }: DashboardProps) {
 
       {view === 'inventario' && (
         <PermissionGate permiso="inventario.ver" fallback={<Forbidden />}>
-          <Inventario />
+          <InventarioV2 />
         </PermissionGate>
       )}
 

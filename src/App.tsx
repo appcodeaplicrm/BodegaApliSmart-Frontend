@@ -10,6 +10,7 @@ import { WaitingForBodega } from './components/WaitingForBodega'
 import { SuperAdminEmpresas, SuperAdminPlanes, SuperAdminPlaceholder } from './components/SuperAdmin'
 import { AppLayout } from './components/AppLayout'
 import { RequireAuth } from './components/RequireAuth'
+import { RealtimeProvider } from './components/RealtimeProvider'
 import { authStore, useAuth } from './store/auth'
 import { bodegasStore } from './store/bodegas'
 import { dashboardStore } from './store/dashboard'
@@ -114,7 +115,7 @@ function AppRoutes() {
 const isLanding = location.pathname === '/'
 
   return (
-    <>
+    <RealtimeProvider>
       {/* El Navbar solo aparece en / y /login */}
       {isLanding && <Navbar />}
 
@@ -417,7 +418,7 @@ const isLanding = location.pathname === '/'
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </RealtimeProvider>
   )
 }
 

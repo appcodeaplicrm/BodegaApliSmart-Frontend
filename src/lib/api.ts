@@ -6,7 +6,13 @@
  *
  * Si una request devuelve 401, intenta un refresh silencioso. Si el refresh
  * también falla, marca la sesión como expirada.
+ *
+ * El back además devuelve el `accessToken` en el body de /auth/login,
+ * /auth/refresh y /auth/me. Lo guardamos en sessionStorage para que el
+ * WebSocket pueda leerlo (la cookie httpOnly no es accesible desde JS).
  */
+
+import { setAccessToken, setUserBodegas } from './socket'
 
 const BASE = '/api'
 
@@ -73,6 +79,24 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const text = await res.text()
   const data: unknown = text ? JSON.parse(text) : null
 
+  // Si la respuesta trae `accessToken` (login/refresh/me), guardarlo
+  // para el WebSocket. Si no viene, no tocamos el token actual.
+  if (data && typeof data === 'object' && 'accessToken' in data) {
+    const token = (data as { accessToken?: unknown }).accessToken
+    if (typeof token === 'string' && token.length > 0) {
+      setAccessToken(token)
+    }
+    // También guardar la lista de bodegas del user, así el back
+    // joinea al socket a las rooms correctas.
+    const obj = data as { usuario?: { bodegas?: unknown } }
+    if (Array.isArray(obj.usuario?.bodegas)) {
+      const bodegas = obj.usuario!.bodegas.filter(
+        (b): b is string => typeof b === 'string' && b.length > 0,
+      )
+      setUserBodegas(bodegas)
+    }
+  }
+
   if (!res.ok) {
     const obj = data as { error?: string; message?: string | string[] } | null
     const code = obj?.error ?? `HTTP ${res.status}`
@@ -132,11 +156,9 @@ let sessionExpiredHandled = false
 function triggerSessionExpired(): void {
   if (sessionExpiredHandled) return
   sessionExpiredHandled = true
-  // Limpia el storage de auth para que el próximo bootstrap arranque limpio.
+  // Limpia el storage de auth y el access token del WebSocket.
   try {
-    // No podemos importar authStore acá (import circular), así que solo
-    // recargamos la página. El bootstrap del front va a detectar que no
-    // hay sesión y mandar al login.
+    setAccessToken(null)
     window.location.replace('/login')
   } catch {
     /* ignore */
