@@ -40,7 +40,15 @@ export function apiBaseUrl(): string {
  *
  * Reglas:
  *  - Si la URL es absoluta (`http://...` / `https://...`) → la devuelve igual.
- *  - Si empieza con `/uploads/...` o es una key relativa → la concatena con `apiBaseUrl()`.
+ *  - Si empieza con `/uploads/...` → la concatena con `apiBaseUrl()`
+ *    (caso típico de URLs legacy que ya vienen con el prefijo).
+ *  - Si es una key RELATIVA (sin prefijo) → le agregamos `/uploads/`
+ *    antes de concatenarla con `apiBaseUrl()`. Esto es lo más común
+ *    hoy: el back devuelve `fotoKey` con la forma
+ *    `{adminId}/bodegas/{warehouseId}/checklist/{uuid}.{ext}` (sin
+ *    el `/uploads/`), y el front la usa directo en `<img>` o
+ *    `fetch`. Si no le pusiéramos el prefijo, el browser pediría
+ *    `http://host/{key}` y el back devolvería 404.
  *  - Si es `null`/`undefined`/vacía → devuelve `null` (el caller decide qué hacer).
  */
 export function imageUrl(urlOrKey: string | null | undefined): string | null {
@@ -50,6 +58,12 @@ export function imageUrl(urlOrKey: string | null | undefined): string | null {
   if (urlOrKey.startsWith('data:') || urlOrKey.startsWith('blob:')) return urlOrKey
   const base = apiBaseUrl()
   if (!base) return null
-  const path = urlOrKey.startsWith('/') ? urlOrKey : `/${urlOrKey}`
+  // Si la key ya viene con `/uploads/`, la respetamos.
+  // Si no, se la agregamos.
+  const path = urlOrKey.startsWith('/uploads/')
+    ? urlOrKey
+    : urlOrKey.startsWith('/')
+      ? `/uploads${urlOrKey}`
+      : `/uploads/${urlOrKey}`
   return `${base}${path}`
 }

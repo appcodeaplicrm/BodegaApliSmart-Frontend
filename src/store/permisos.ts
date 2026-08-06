@@ -73,6 +73,7 @@ export const MODULOS: readonly ModuloDef[] = [
       { key: 'devoluciones', label: 'Devoluciones' },
       { key: 'asignadas', label: 'Herramientas Asignadas' },
       { key: 'proyectos', label: 'Proyectos' },
+      { key: 'checklist', label: 'Checklist' },
     ],
   },
   {

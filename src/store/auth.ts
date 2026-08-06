@@ -5,7 +5,12 @@ export type UsuarioActivo = {
   id: string
   nombre: string
   email: string
+  /** Key del rol (ej: "admin", "superadmin", "rol-1786-yznh"). Se usa
+   * para checks de permiso, BYPASS_ROLES, etc. */
   rol: string
+  /** Nombre legible del rol (ej: "Administrador", "Operador"). Es el
+   * que se muestra en UI (sidebar, chips, etc.). */
+  rolNombre?: string
   bodegas: string[]
   bodegaId: string | null
 }

@@ -18,6 +18,7 @@ import { useUnidadesMedida, unidadesMedidaStore, type UnidadMedida } from '../st
 import { PageHeader } from './PageHeader'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
+import { Modal } from './checklist/Modal'
 
 const TIPOS_FILTRO = [
   { value: 'todos', label: 'Todos' },
@@ -64,13 +65,17 @@ export function Movimientos() {
   useEffect(() => {
     if (!activaId) return
     setPage(1)
+    setFiltroProducto('todos')
     void movimientosStore
       .cargarPaginado({ bodegaId: activaId, page: 1, pageSize })
       .catch(() => undefined)
-    if (prodState.status === 'idle') {
-      void productosStore.cargarPaginado({ bodegaId: activaId, page: 1, pageSize: 100 })
-        .catch(() => undefined)
-    }
+    // SIEMPRE recargamos los productos cuando cambia la bodega activa.
+    // Antes solo se hacía en el primer mount (`status === 'idle'`),
+    // lo que dejaba el dropdown con productos de OTRA bodega al
+    // cambiar la activa — bug cross-tenant.
+    void productosStore
+      .cargarPaginado({ bodegaId: activaId, page: 1, pageSize: 100 })
+      .catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activaId, pageSize])
 
@@ -268,7 +273,7 @@ export function Movimientos() {
           ✓ {toast}
         </div>
       )}
-    </div>
+      </div>
     </div>
   )
 }
@@ -497,12 +502,9 @@ function NuevoMovimientoModal({ bodegaId, productos, onClose, onCreated }: Modal
     productoSel && unidadId && unidadId !== productoSel.unidadMedida.id
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <Modal zIndex={100} full>
       <div
-        className="bg-card border border-border w-full max-w-lg max-h-[92vh] flex flex-col"
+        className="bg-card border border-border w-full max-w-lg flex flex-col"
         style={{ borderRadius: '0.25rem' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -725,7 +727,7 @@ function NuevoMovimientoModal({ bodegaId, productos, onClose, onCreated }: Modal
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 

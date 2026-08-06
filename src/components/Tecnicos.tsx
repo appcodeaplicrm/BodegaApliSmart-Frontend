@@ -1,6 +1,7 @@
 import { getSubmodulo, SUBMODULOS_TECNICOS } from './tecnicos/tecnicos'
 import { SubmoduloView } from './tecnicos/SubmoduloView'
 import { Ordenes } from './Ordenes'
+import { ChecklistView } from './checklist/ChecklistView'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { PageHeader } from './PageHeader'
@@ -13,6 +14,11 @@ export function Tecnicos({ subKey }: TecnicosProps) {
   // 'Solicitudes de Recursos' usa la pantalla completa de Órdenes
   if (subKey === 'solicitudes') {
     return <Ordenes />
+  }
+  // 'Checklist' tiene su propia vista completa (no encaja en el
+  // SubmoduloView genérico porque tiene tabs internos y dos secciones).
+  if (subKey === 'checklist') {
+    return <ChecklistView />
   }
 
   // Convertir el path segment (ej: "solicitudes") al key completo (ej: "tecnicos:solicitudes")

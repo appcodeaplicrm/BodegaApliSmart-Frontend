@@ -29,6 +29,7 @@ import {
   Undo2,
   HardHat,
   FolderKanban,
+  ListChecks,
   AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -173,6 +174,13 @@ const general: NavItem[] = [
         icon: FolderKanban,
         permiso: 'tecnicos.proyectos.ver',
       },
+      {
+        key: 'checklist',
+        path: '/tecnicos/checklist',
+        label: 'Checklist',
+        icon: ListChecks,
+        permiso: 'tecnicos.checklist.ver',
+      },
     ],
   },
   {
@@ -289,10 +297,11 @@ export function Sidebar({ active, subKey, onLogout }: SidebarProps) {
   const sesion = auth.status === 'autenticado' ? auth.sesion : null
   const usuario = sesion?.usuario ?? null
   const nombreUsuario = usuario?.nombre ?? '—'
-  const rolUsuario = usuario?.rol ?? '—'
-  // Solo los admins pueden crear bodegas. Consideramos tanto 'admin' como
-  // 'superadmin' (por si el back emite ese nombre en algún flujo).
-  const rolKey = (rolUsuario ?? '').toLowerCase().trim()
+  // `rolUsuario` muestra el NOMBRE legible del rol. Fallback al `rol`
+  // (la key) si el back no envía `rolNombre` (sesiones viejas).
+  const rolUsuario = usuario?.rolNombre ?? usuario?.rol ?? '—'
+  // Para checks de permiso seguimos usando la key (no el nombre legible).
+  const rolKey = (usuario?.rol ?? '').toLowerCase().trim()
   const esSuperadmin = rolKey === 'superadmin'
   // Nombre legible de la bodega activa del usuario. Tomamos la bodega cuyo id
   // coincide con usuario.bodegaId y caemos al nombre del back si está disponible.

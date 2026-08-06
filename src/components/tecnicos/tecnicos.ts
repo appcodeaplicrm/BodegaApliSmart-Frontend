@@ -6,6 +6,7 @@ import {
   Undo2,
   HardHat,
   FolderKanban,
+  ListChecks,
 } from 'lucide-react'
 
 export type TecnicoSubKey =
@@ -15,6 +16,7 @@ export type TecnicoSubKey =
   | 'tecnicos:devoluciones'
   | 'tecnicos:asignadas'
   | 'tecnicos:proyectos'
+  | 'tecnicos:checklist'
 
 export type Submodulo = {
   key: TecnicoSubKey
@@ -22,7 +24,7 @@ export type Submodulo = {
   descripcion: string
   icon: LucideIcon
   accion: string
-  kpis: { label: string; value: string; accent: 'text-primary' | 'text-secondary' | 'text-muted-foreground' }[]
+  kpis: { label: string; value: string; accent: 'text-primary' | 'text-secondary' | 'text-muted-foreground' | 'text-yellow-400' }[]
 }
 
 export const SUBMODULOS_TECNICOS: Submodulo[] = [
@@ -96,6 +98,18 @@ export const SUBMODULOS_TECNICOS: Submodulo[] = [
       { label: 'Activos', value: '0', accent: 'text-secondary' },
       { label: 'Técnicos asignados', value: '0', accent: 'text-primary' },
       { label: 'Por iniciar', value: '0', accent: 'text-muted-foreground' },
+    ],
+  },
+  {
+    key: 'tecnicos:checklist',
+    label: 'Checklist',
+    descripcion: 'Plantillas de verificación de instrumentos, agendamiento por rol e historial de ejecuciones.',
+    icon: ListChecks,
+    accion: 'Nueva plantilla',
+    kpis: [
+      { label: 'Plantillas activas', value: '0', accent: 'text-primary' },
+      { label: 'Pendientes', value: '0', accent: 'text-yellow-400' },
+      { label: 'Vencidos', value: '0', accent: 'text-primary' },
     ],
   },
 ]

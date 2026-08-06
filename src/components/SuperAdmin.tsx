@@ -454,13 +454,14 @@ const SUBMODULE_LABELS: Record<string, string> = {
   'tecnicos.devoluciones': 'Devoluciones',
   'tecnicos.asignadas': 'Herramientas Asignadas',
   'tecnicos.proyectos': 'Proyecto',
+  'tecnicos.checklist': 'Checklist',
   'reportes.salidas': 'Salida',
   'reportes.entradas': 'Entrada',
   'reportes.kardex': 'Kardex',
 }
 
 const SUBMODULE_ORDER: Record<string, string[]> = {
-  tecnicos: ['__module__', 'solicitudes', 'herramientas', 'alertas', 'devoluciones', 'asignadas', 'proyectos'],
+  tecnicos: ['__module__', 'solicitudes', 'herramientas', 'alertas', 'devoluciones', 'asignadas', 'proyectos', 'checklist'],
   reportes: ['__module__', 'salidas', 'entradas', 'kardex'],
 }
 
