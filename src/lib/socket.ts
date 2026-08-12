@@ -163,8 +163,9 @@ export function getSocket(): Socket | null {
   socket = io(getSocketUrl(), {
     path: '/api/socket.io',
     auth: { token, bodegas: currentBodegas },
-    // Prioriza WebSocket y conserva polling como transporte de respaldo.
-    transports: ['websocket', 'polling'],
+    // Inicia con polling y, si el proxy lo permite, asciende a WebSocket.
+    // Si el upgrade falla, Socket.IO mantiene la conexión por polling.
+    transports: ['polling', 'websocket'],
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
