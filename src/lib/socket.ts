@@ -163,11 +163,8 @@ export function getSocket(): Socket | null {
   socket = io(getSocketUrl(), {
     path: '/api/socket.io',
     auth: { token, bodegas: currentBodegas },
-    // El proxy administrado por aaPanel permite Socket.IO polling, pero
-    // no reenvía el Upgrade necesario para WebSocket. Forzar polling
-    // evita intentos fallidos y mantiene los eventos en tiempo real.
-    transports: ['polling'],
-    upgrade: false,
+    // Prioriza WebSocket y conserva polling como transporte de respaldo.
+    transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
