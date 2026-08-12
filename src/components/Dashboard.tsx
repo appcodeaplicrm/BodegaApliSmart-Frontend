@@ -17,6 +17,10 @@ import { PermissionGate } from './PermissionGate'
 import { Forbidden } from './Forbidden'
 import { Alertas } from './Alertas'
 import { Movimientos } from './Movimientos'
+import { CategoriasScreen } from './inventario/CategoriasScreen'
+import { MarcasScreen } from './inventario/MarcasScreen'
+import { ProveedoresScreen } from './inventario/ProveedoresScreen'
+import { UbicacionesScreen } from './inventario/UbicacionesScreen'
 
 type DashboardProps = {
   /**
@@ -38,6 +42,10 @@ type DashboardProps = {
     | 'reportes'
     | 'alertas'
     | 'movimientos'
+    | 'categorias'
+    | 'marcas'
+    | 'proveedores'
+    | 'ubicaciones'
   onExit: () => void | Promise<void>
 }
 
@@ -105,6 +113,30 @@ export function Dashboard({ view = 'dashboard', onExit }: DashboardProps) {
       {view === 'inventario' && (
         <PermissionGate permiso="inventario.ver" fallback={<Forbidden />}>
           <InventarioV2 />
+        </PermissionGate>
+      )}
+
+      {view === 'categorias' && (
+        <PermissionGate permiso="inventario.ver" fallback={<Forbidden />}>
+          <CategoriasScreen />
+        </PermissionGate>
+      )}
+
+      {view === 'marcas' && (
+        <PermissionGate permiso="inventario.ver" fallback={<Forbidden />}>
+          <MarcasScreen />
+        </PermissionGate>
+      )}
+
+      {view === 'proveedores' && (
+        <PermissionGate permiso="inventario.ver" fallback={<Forbidden />}>
+          <ProveedoresScreen />
+        </PermissionGate>
+      )}
+
+      {view === 'ubicaciones' && (
+        <PermissionGate permiso="inventario.ver" fallback={<Forbidden />}>
+          <UbicacionesScreen />
         </PermissionGate>
       )}
 

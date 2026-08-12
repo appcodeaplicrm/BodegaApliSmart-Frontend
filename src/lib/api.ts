@@ -13,6 +13,9 @@
  */
 
 import { setAccessToken, setUserBodegas } from './socket'
+import { apiToast } from './apiToasts'
+import { mensajeExito } from './apiMessages'
+import { bodegaActivaStore } from '../store/bodegaActiva'
 
 const BASE = '/api'
 
@@ -41,12 +44,24 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   // y NO seteamos Content-Type manualmente.
   const isFormData = body instanceof FormData
 
+  // Header automático: enviar la bodega activa en `X-Bodega-Id` para
+  // que el `BodegaAccessGuard` del back pueda resolver el contexto
+  // sin tener que exigir `bodegaId` en query/body en cada endpoint.
+  // (corrección 10 del .md)
+  // El caller puede pisarlo pasando `X-Bodega-Id` explícito en
+  // `headers` (eso se respeta al final, en el spread).
+  const bodegaActivaId = bodegaActivaStore.getId()
+  const bodegaHeader: Record<string, string> = bodegaActivaId
+    ? { 'X-Bodega-Id': bodegaActivaId }
+    : {}
+
   const init: RequestInit = {
     method: rest.method ?? 'GET',
     credentials: 'include',
     headers: {
       Accept: 'application/json',
       ...(body !== undefined && !isFormData ? { 'Content-Type': 'application/json' } : {}),
+      ...bodegaHeader,
       ...headers,
     },
     ...rest,
@@ -103,6 +118,16 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     const message = Array.isArray(obj?.message)
       ? obj!.message.join(', ')
       : (obj?.message ?? res.statusText)
+    // Toast de error solo para mutaciones (POST/PATCH/PUT/DELETE).
+    // GET no muestra nada para no ensuciar la UI en cada refetch.
+    // 401 ya dispara triggerSessionExpired y manda al login, así
+    // que un toast ahí sería ruido.
+    if (
+      res.status !== 401 &&
+      ['POST', 'PATCH', 'PUT', 'DELETE'].includes((rest.method ?? init.method ?? 'GET').toUpperCase())
+    ) {
+      apiToast.error(message || 'Ocurrió un error')
+    }
     throw new ApiError(res.status, code, message, data)
   }
 
@@ -135,13 +160,29 @@ async function tryRefresh(): Promise<boolean> {
 export const api = {
   get: <T,>(path: string, opts?: RequestOptions) => request<T>(path, { ...opts, method: 'GET' }),
   post: <T,>(path: string, body?: unknown, opts?: RequestOptions) =>
-    request<T>(path, { ...opts, method: 'POST', body }),
+    request<T>(path, { ...opts, method: 'POST', body }).then((data) => {
+      const msg = mensajeExito('POST', path)
+      if (msg) apiToast.exito(msg)
+      return data
+    }),
   put: <T,>(path: string, body?: unknown, opts?: RequestOptions) =>
-    request<T>(path, { ...opts, method: 'PUT', body }),
+    request<T>(path, { ...opts, method: 'PUT', body }).then((data) => {
+      const msg = mensajeExito('PUT', path)
+      if (msg) apiToast.exito(msg)
+      return data
+    }),
   patch: <T,>(path: string, body?: unknown, opts?: RequestOptions) =>
-    request<T>(path, { ...opts, method: 'PATCH', body }),
+    request<T>(path, { ...opts, method: 'PATCH', body }).then((data) => {
+      const msg = mensajeExito('PATCH', path)
+      if (msg) apiToast.exito(msg)
+      return data
+    }),
   delete: <T,>(path: string, opts?: RequestOptions) =>
-    request<T>(path, { ...opts, method: 'DELETE' }),
+    request<T>(path, { ...opts, method: 'DELETE' }).then((data) => {
+      const msg = mensajeExito('DELETE', path)
+      if (msg) apiToast.exito(msg)
+      return data
+    }),
 }
 
 /**

@@ -18,7 +18,7 @@ export function WaitingForBodega() {
   }
 
   return (
-    <div className="h-screen w-screen bg-background flex items-center justify-center p-6">
+    <div className="h-dvh w-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-md text-center">
         <div className="inline-flex w-14 h-14 bg-secondary/15 items-center justify-center mb-5">
           <Clock size={24} className="text-secondary" />

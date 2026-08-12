@@ -204,6 +204,8 @@ export const usuariosStore = {
     rol: RolUsuario | string
     bodegaId?: string | null
     estado: EstadoUsuario
+    /** Sprint 3: múltiples asignaciones (bodega + rol por bodega). */
+    asignaciones?: Array<{ bodegaId: string; rolKey: string; esPrincipal?: boolean; permisos?: string[] }>
   }): Promise<Usuario> {
     const body = {
       nombre: input.nombre,
@@ -212,6 +214,9 @@ export const usuariosStore = {
       rolKey: input.rol,
       bodegaId: input.bodegaId ?? undefined,
       estado: input.estado,
+      ...(input.asignaciones && input.asignaciones.length > 0
+        ? { asignaciones: input.asignaciones }
+        : {}),
     }
     const created = await api.post<ApiUsuario>('/auth/register', body)
     return fromApi(created)

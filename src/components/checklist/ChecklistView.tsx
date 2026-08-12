@@ -15,10 +15,11 @@ import { useChecklist } from './useChecklist'
 import { useChecklistPerms } from './useChecklistPerms'
 import { Plantillas } from './Plantillas'
 import { ProgramadosHistorial } from './ProgramadosHistorial'
-import { NuevaPlantillaForm } from './NuevaPlantillaForm'
+import { PlantillaForm } from './PlantillaForm'
+import { ConfirmModal } from './ConfirmModal'
 import { AgendarModal } from './AgendarModal'
-import { togglePlantilla as apiToggle, agendar as apiAgendar } from './api'
-import type { PlantillaListItem } from './types'
+import { togglePlantilla as apiToggle, agendar as apiAgendar, eliminarPlantilla as apiEliminar, obtenerPlantilla } from './api'
+import type { Plantilla, PlantillaListItem } from './types'
 
 type Section = 'plantillas' | 'programados'
 
@@ -31,8 +32,14 @@ export function ChecklistView() {
   // inicial a "programados" en ese caso.
   const [section, setSection] = useState<Section>(perms.canManage ? 'plantillas' : 'programados')
 
-  // Form de nueva plantilla (reemplaza la lista, NO es modal).
+  // Form de plantilla: si `editing` es null, está en modo creación;
+  // si tiene valor, es el `initial` del form de edición.
   const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Plantilla | null>(null)
+  const [loadingPlantilla, setLoadingPlantilla] = useState(false)
+
+  // Modal de confirmación para eliminar plantilla.
+  const [toDelete, setToDelete] = useState<PlantillaListItem | null>(null)
 
   // Modal de agendar. `agPlantilla` es la plantilla pre-seleccionada
   // cuando se abre desde el botón "Agendar" de una plantilla concreta.
@@ -61,6 +68,33 @@ export function ChecklistView() {
     setShowAgenda(true)
   }
 
+  const handleEditarPlantilla = async (p: PlantillaListItem) => {
+    if (!perms.canCreate) return
+    setLoadingPlantilla(true)
+    setShowForm(true)
+    try {
+      // Cargamos el detalle completo (incluye empresa/objeto/items).
+      const full = await obtenerPlantilla(p.id, data.bodegaId)
+      setEditing(full)
+    } catch (e) {
+      alert((e as Error).message ?? 'No se pudo cargar la plantilla.')
+      setShowForm(false)
+    } finally {
+      setLoadingPlantilla(false)
+    }
+  }
+
+  const handleCloseForm = () => {
+    setShowForm(false)
+    setEditing(null)
+  }
+
+  const handleEliminarPlantilla = async () => {
+    if (!toDelete) return
+    await apiEliminar(toDelete.id, data.bodegaId)
+    await data.reload()
+  }
+
   if (!data.bodegaId) {
     return <SinBodegaActiva />
   }
@@ -77,8 +111,11 @@ export function ChecklistView() {
         actions={
           perms.canCreate ? (
             <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+              onClick={() => {
+                setEditing(null)
+                setShowForm(true)
+              }}
+              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
               style={{ borderRadius: '0.25rem' }}
             >
               <Plus size={13} />
@@ -89,7 +126,7 @@ export function ChecklistView() {
       />
 
       {/* KPI mini-strip (oculto en <xl, igual que el resto del módulo) */}
-      <div className="px-8 pt-6 hidden xl:grid grid-cols-4 border-b border-border">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 hidden xl:grid grid-cols-4 border-b border-border">
         <KpiCell label="PLANTILLAS ACTIVAS" value={kpis.activas} accent="text-foreground" />
         <KpiCell label="PENDIENTES" value={kpis.pendientes} accent="text-yellow-400" />
         <KpiCell label="COMPLETADOS" value={kpis.completados} accent="text-secondary" />
@@ -101,7 +138,7 @@ export function ChecklistView() {
           arranca directo en "Programados & Historial" y se oculta
           la otra pestaña. */}
       {perms.canManage && (
-        <div className="px-8 pt-4">
+        <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4">
           <div className="inline-flex items-center gap-1 p-1 bg-muted rounded-lg border border-border w-fit">
             <TabButton active={section === 'plantillas'} onClick={() => setSection('plantillas')}>
               Plantillas
@@ -116,19 +153,39 @@ export function ChecklistView() {
         </div>
       )}
 
+      {/* Mobile: botón "+ Nueva plantilla" full-width debajo de los tabs
+          (solo visible cuando estamos en la pestaña Plantillas). */}
+      {perms.canCreate && section === 'plantillas' && perms.canManage && (
+        <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              setEditing(null)
+              setShowForm(true)
+            }}
+            className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 active:opacity-80 transition-opacity"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <Plus size={15} />
+            Nueva plantilla
+          </button>
+        </div>
+      )}
+
       {/* Contenido */}
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
         {data.loading ? (
           <LoadingState />
         ) : data.error ? (
           <ErrorState message={data.error} onRetry={data.reload} />
         ) : showForm && perms.canCreate ? (
-          <NuevaPlantillaForm
+          <PlantillaForm
             roles={data.roles}
             bodegaId={data.bodegaId}
-            onCancel={() => setShowForm(false)}
-            onCreated={async () => {
-              setShowForm(false)
+            initial={editing ?? undefined}
+            onCancel={handleCloseForm}
+            onSaved={async () => {
+              handleCloseForm()
               await data.reload()
             }}
           />
@@ -141,6 +198,8 @@ export function ChecklistView() {
               await data.reload()
             }}
             onAgendar={(p) => handleAgendar(p)}
+            onEditar={handleEditarPlantilla}
+            onEliminar={(p) => setToDelete(p)}
             onReload={data.reload}
           />
         ) : (
@@ -172,6 +231,35 @@ export function ChecklistView() {
             await data.reload()
           }}
         />
+      )}
+
+      {toDelete && (
+        <ConfirmModal
+          open
+          onClose={() => setToDelete(null)}
+          title="Eliminar plantilla"
+          description={
+            <>
+              ¿Eliminar la plantilla <strong>"{toDelete.nombre}"</strong>?
+              <br />
+              Esta acción no se puede deshacer. Si la plantilla tiene
+              asignaciones, no se podrá eliminar.
+            </>
+          }
+          confirmLabel="Eliminar plantilla"
+          tone="danger"
+          onConfirm={handleEliminarPlantilla}
+        />
+      )}
+
+      {loadingPlantilla && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center pointer-events-none">
+          <div className="bg-card border border-border px-4 py-3 text-sm text-foreground inline-flex items-center gap-2"
+            style={{ borderRadius: '0.25rem' }}>
+            <Plus size={14} className="animate-pulse" />
+            Cargando plantilla…
+          </div>
+        </div>
       )}
     </div>
   )

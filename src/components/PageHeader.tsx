@@ -25,7 +25,7 @@ type Props = {
 
 export function PageHeader({ title, subtitle, actions }: Props) {
   return (
-    <header className="h-14 border-b border-border px-6 flex items-center justify-between shrink-0 gap-3">
+    <header className="hidden lg:flex h-14 border-b border-border px-6 items-center justify-between shrink-0 gap-3">
       <div className="min-w-0">
         <h1
           className="text-2xl uppercase text-foreground leading-none"

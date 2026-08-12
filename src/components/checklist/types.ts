@@ -32,7 +32,25 @@ export type Plantilla = {
    * con la hora/minuto, o null si no se setea). El calendario usa
    * esta hora para posicionar el bloque. */
   horaSugerida: string | null
+  /** Qué plantilla de PDF se usa al imprimir. Hay 2 hardcodeadas en
+   * el front: "escaleras" o "epp". Default: "escaleras". */
+  htmlKind: 'escaleras' | 'epp'
   createdAt: string
+  // ─── PDF header (empresa) ───
+  empresaLogoKey: string | null
+  empresaLogoUrl?: string | null
+  empresaNombre: string | null
+  empresaDepartamento: string | null
+  empresaFormato: string | null
+  // ─── PDF objeto ───
+  objetoNombre: string | null
+  objetoLongitud: string | null
+  objetoTipo: string | null
+  objetoTipos: string[]
+  objetoCapacidad: string | null
+  objetoCodigo: string | null
+  objetoFotoKey: string | null
+  objetoFotoUrl?: string | null
   items: CkItem[]
 }
 
@@ -49,6 +67,8 @@ export type CkAsignado = {
    * calendario usa esta hora para posicionar el bloque. Null si la
    * plantilla no la tiene seteada. */
   plantillaHoraSugerida: string | null
+  /** Qué plantilla de PDF se usa al imprimir. */
+  plantillaHtmlKind: 'escaleras' | 'epp'
   tecnico: string
   tecnicoEmail?: string
   rol: string
@@ -74,7 +94,7 @@ export type CkEjecucionItemView = {
 
 export type CkAsignacionDetalle = {
   id: string
-  plantilla: { id: string; nombre: string }
+  plantilla: { id: string; nombre: string; htmlKind: 'escaleras' | 'epp' }
   tecnico: { id: string; nombre: string; email: string }
   bodegaId: string
   fechaLimite: string

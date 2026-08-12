@@ -11,10 +11,12 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
+  Undo2,
 } from 'lucide-react'
 import { uploadsService } from '../store/productos'
 import { devolucionesStore, type Devolucion } from '../store/devoluciones'
 import { ApiError } from '../lib/api'
+import { Modal } from './Modal'
 
 type Step = {
   devolucionItemId: string
@@ -261,78 +263,112 @@ export function DevolucionWizard({ devolucion, rol, onClose, onResolved }: Props
 
   if (!current) {
     return (
-      <div
-        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <div
-          className="bg-card border border-border p-6 max-w-md"
-          onClick={(e) => e.stopPropagation()}
-          style={{ borderRadius: '0.25rem' }}
-        >
-          <p className="text-foreground mb-4">
-            No hay items pendientes para procesar.
-          </p>
+      <Modal
+        open
+        onClose={onClose}
+        title="Sin items pendientes"
+        description={devolucion.codigo}
+        icon={<Undo2 size={16} className="text-primary" />}
+        size="sm"
+        footer={
           <div className="flex justify-end">
             <button
+              type="button"
               onClick={onClose}
-              className="px-3 py-2 border border-border text-sm"
+              className="px-3 min-h-[44px] py-2.5 border border-border text-sm"
               style={{ borderRadius: '0.25rem' }}
             >
               Cerrar
             </button>
           </div>
-        </div>
-      </div>
+        }
+      >
+        <p className="p-5 text-foreground">
+          No hay items pendientes para procesar.
+        </p>
+      </Modal>
     )
   }
 
   const rolLabel = rol === 'operador' ? 'Operador' : 'Bodega'
+  const wizardTitle = rol === 'operador' ? 'Enviar devolución' : 'Recibir devolución'
+  const wizardSubtitle =
+    rol === 'operador'
+      ? 'Foto de cada item antes de enviar al bodeguero'
+      : 'Foto de cada item recibido del operador'
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-2xl max-h-[92vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div>
-            <div
-              className="text-[10px] text-muted-foreground tracking-widest uppercase"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              {devolucion.codigo} · {rolLabel}
-            </div>
-            <h2
-              className="text-xl uppercase text-foreground mt-1 leading-none"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-            >
-              {rol === 'operador' ? 'Enviar devolución' : 'Recibir devolución'}
-            </h2>
-            <p
-              className="mt-1 text-xs text-muted-foreground"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
-            >
-              {rol === 'operador'
-                ? 'Foto de cada item antes de enviar al bodeguero'
-                : 'Foto de cada item recibido del operador'}
-            </p>
-          </div>
+    <Modal
+      open
+      onClose={onClose}
+      title={wizardTitle}
+      description={`${devolucion.codigo} · ${rolLabel}`}
+      icon={<Camera size={16} className="text-primary" />}
+      size="lg"
+      footer={
+        <div className="flex items-center gap-2">
           <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Cerrar"
+            type="button"
+            onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
+            disabled={isFirst || uploading || finalizing || rejecting}
+            className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border text-sm hover:border-foreground/30 disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ borderRadius: '0.25rem' }}
           >
-            <X size={18} />
+            <ArrowLeft size={14} /> Anterior
+          </button>
+
+          {/* Rechazo solo para bodeguero (operador no rechaza sus propios items) */}
+          {rol === 'bodeguero' && !showReject && (
+            <button
+              type="button"
+              onClick={() => setShowReject(true)}
+              disabled={uploading || finalizing || rejecting}
+              className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground text-sm hover:border-primary/40 hover:text-primary disabled:opacity-50"
+              style={{ borderRadius: '0.25rem' }}
+              title="Rechazar este producto"
+            >
+              <XCircle size={14} /> Rechazar
+            </button>
+          )}
+
+          <div className="flex-1" />
+
+          <button
+            type="button"
+            onClick={handleSiguiente}
+            disabled={!photoUrl || uploading || finalizing || rejecting}
+            className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            {uploading ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Subiendo…
+              </>
+            ) : finalizing ? (
+              <>
+                <Loader2 size={14} className="animate-spin" /> Finalizando…
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={14} />
+                {isLast ? 'Finalizar' : 'Siguiente'} <ArrowRight size={14} />
+              </>
+            )}
           </button>
         </div>
+      }
+    >
+      <div className="p-5 space-y-4">
+        <p
+          className="text-xs text-muted-foreground -mt-1"
+          style={{ fontFamily: "'DM Sans', sans-serif" }}
+        >
+          {wizardSubtitle}
+        </p>
 
         {/* Stepper */}
-        <div className="px-5 pt-4 pb-2 shrink-0">
+        <div className="-mx-1">
           <div className="flex items-center justify-between mb-2">
             {steps.map((_it, idx) => {
               const done = idx < stepIdx
@@ -365,250 +401,195 @@ export function DevolucionWizard({ devolucion, rol, onClose, onResolved }: Props
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div
-            className="bg-muted/40 border border-border p-3"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div
-                  className="text-[10px] text-muted-foreground tracking-widest uppercase"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  {rol === 'operador' ? 'Item a devolver' : 'Item recibido'}
-                </div>
-                <div
-                  className="text-lg text-foreground mt-0.5"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
-                >
-                  {current.productoNombre}
-                </div>
-                <div
-                  className="text-[10px] text-muted-foreground"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  SKU {current.productoCodigo}
-                </div>
-              </div>
-              <div className="text-right">
-                <div
-                  className="text-[10px] text-muted-foreground tracking-widest uppercase"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  Cantidad
-                </div>
-                <div
-                  className="text-xl text-primary"
-                  style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}
-                >
-                  ×{current.cantidad}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cámara / preview */}
-          {cameraOn ? (
-            <div
-              className="relative w-full aspect-video bg-muted border border-border overflow-hidden flex items-center justify-center"
-              style={{ borderRadius: '0.25rem' }}
-            >
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                playsInline
-                muted
-              />
-            </div>
-          ) : photoUrl ? (
-            <div
-              className="w-full flex items-center gap-2 py-2.5 px-3 border border-secondary/40 bg-secondary/5 text-secondary"
-              style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              <CheckCircle2 size={16} className="shrink-0" />
-              <span className="text-xs font-medium">Imagen subida</span>
-            </div>
-          ) : (
-            <div
-              className="w-full flex items-center gap-2 py-2.5 px-3 border border-border bg-muted text-muted-foreground"
-              style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              <ImageIcon size={16} className="shrink-0" />
-              <span className="text-xs font-medium">Sin imagen</span>
-            </div>
-          )}
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFile}
-            className="hidden"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            {!cameraOn && !photoUrl && (
-              <>
-                <button
-                  type="button"
-                  onClick={startCamera}
-                  className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm hover:border-foreground/30"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <CameraIcon size={14} /> Abrir cámara
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm hover:border-foreground/30"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <Camera size={14} /> Subir foto
-                </button>
-              </>
-            )}
-            {cameraOn && (
-              <>
-                <button
-                  type="button"
-                  onClick={capture}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground text-sm"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <Camera size={14} /> Capturar
-                </button>
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <X size={14} /> Cancelar cámara
-                </button>
-              </>
-            )}
-            {photoUrl && !cameraOn && (
-              <button
-                type="button"
-                onClick={resetPhoto}
-                className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm"
-                style={{ borderRadius: '0.25rem' }}
-              >
-                <RefreshCcw size={14} /> Tomar otra
-              </button>
-            )}
-          </div>
-
-          {/* Rechazo (con motivo) - solo bodeguero */}
-          {showReject && (
-            <div
-              className="bg-muted border border-border p-3 space-y-2"
-              style={{ borderRadius: '0.25rem' }}
-            >
-              <label
+        <div
+          className="bg-muted/40 border border-border p-3"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div
                 className="text-[10px] text-muted-foreground tracking-widest uppercase"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                Motivo del rechazo
-              </label>
-              <textarea
-                value={motivoRechazo}
-                onChange={(e) => setMotivoRechazo(e.target.value)}
-                rows={2}
-                placeholder="Ej: producto dañado, no coincide con la solicitud…"
-                className="w-full px-3 py-2 bg-card border border-border text-sm outline-none focus:border-primary/60 resize-none"
-                style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowReject(false)
-                    setMotivoRechazo('')
-                  }}
-                  className="px-3 py-1.5 border border-border text-xs"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRechazar}
-                  disabled={rejecting}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  {rejecting ? <Loader2 size={12} className="animate-spin" /> : null}
-                  Confirmar rechazo
-                </button>
+                {rol === 'operador' ? 'Item a devolver' : 'Item recibido'}
+              </div>
+              <div
+                className="text-lg text-foreground mt-0.5"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
+              >
+                {current.productoNombre}
+              </div>
+              <div
+                className="text-[10px] text-muted-foreground"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                SKU {current.productoCodigo}
               </div>
             </div>
-          )}
-
-          {error && (
-            <p
-              className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
-              style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
-            >
-              ⚠ {error}
-            </p>
-          )}
+            <div className="text-right">
+              <div
+                className="text-[10px] text-muted-foreground tracking-widest uppercase"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                Cantidad
+              </div>
+              <div
+                className="text-xl text-primary"
+                style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}
+              >
+                ×{current.cantidad}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setStepIdx((i) => Math.max(0, i - 1))}
-            disabled={isFirst || uploading || finalizing || rejecting}
-            className="inline-flex items-center gap-1 px-3 py-2.5 border border-border text-sm hover:border-foreground/30 disabled:opacity-30 disabled:cursor-not-allowed"
+        {/* Cámara / preview */}
+        {cameraOn ? (
+          <div
+            className="relative w-full aspect-video bg-muted border border-border overflow-hidden flex items-center justify-center"
             style={{ borderRadius: '0.25rem' }}
           >
-            <ArrowLeft size={14} /> Anterior
-          </button>
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              playsInline
+              muted
+            />
+          </div>
+        ) : photoUrl ? (
+          <div
+            className="w-full flex items-center gap-2 py-2.5 px-3 border border-secondary/40 bg-secondary/5 text-secondary"
+            style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            <CheckCircle2 size={16} className="shrink-0" />
+            <span className="text-xs font-medium">Imagen subida</span>
+          </div>
+        ) : (
+          <div
+            className="w-full flex items-center gap-2 py-2.5 px-3 border border-border bg-muted text-muted-foreground"
+            style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            <ImageIcon size={16} className="shrink-0" />
+            <span className="text-xs font-medium">Sin imagen</span>
+          </div>
+        )}
 
-          {/* Rechazo solo para bodeguero (operador no rechaza sus propios items) */}
-          {rol === 'bodeguero' && !showReject && (
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFile}
+          className="hidden"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          {!cameraOn && !photoUrl && (
+            <>
+              <button
+                type="button"
+                onClick={startCamera}
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <CameraIcon size={14} /> Abrir cámara
+              </button>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <Camera size={14} /> Subir foto
+              </button>
+            </>
+          )}
+          {cameraOn && (
+            <>
+              <button
+                type="button"
+                onClick={capture}
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 bg-primary text-primary-foreground text-sm"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <Camera size={14} /> Capturar
+              </button>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <X size={14} /> Cancelar cámara
+              </button>
+            </>
+          )}
+          {photoUrl && !cameraOn && (
             <button
               type="button"
-              onClick={() => setShowReject(true)}
-              disabled={uploading || finalizing || rejecting}
-              className="inline-flex items-center gap-1 px-3 py-2.5 border border-border bg-muted text-foreground text-sm hover:border-primary/40 hover:text-primary disabled:opacity-50"
+              onClick={resetPhoto}
+              className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm"
               style={{ borderRadius: '0.25rem' }}
-              title="Rechazar este producto"
             >
-              <XCircle size={14} /> Rechazar
+              <RefreshCcw size={14} /> Tomar otra
             </button>
           )}
+        </div>
 
-          <div className="flex-1" />
-
-          <button
-            type="button"
-            onClick={handleSiguiente}
-            disabled={!photoUrl || uploading || finalizing || rejecting}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        {/* Rechazo (con motivo) - solo bodeguero */}
+        {showReject && (
+          <div
+            className="bg-muted border border-border p-3 space-y-2"
             style={{ borderRadius: '0.25rem' }}
           >
-            {uploading ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                Subiendo…
-              </>
-            ) : finalizing ? (
-              <>
-                <Loader2 size={14} className="animate-spin" /> Finalizando…
-              </>
-            ) : (
-              <>
-                <CheckCircle2 size={14} />
-                {isLast ? 'Finalizar' : 'Siguiente'} <ArrowRight size={14} />
-              </>
-            )}
-          </button>
-        </div>
+            <label
+              className="text-[10px] text-muted-foreground tracking-widest uppercase"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              Motivo del rechazo
+            </label>
+            <textarea
+              value={motivoRechazo}
+              onChange={(e) => setMotivoRechazo(e.target.value)}
+              rows={2}
+              placeholder="Ej: producto dañado, no coincide con la solicitud…"
+              className="w-full min-h-[44px] px-3 py-2 bg-card border border-border text-sm outline-none focus:border-primary/60 resize-none"
+              style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowReject(false)
+                  setMotivoRechazo('')
+                }}
+                className="min-h-[44px] px-3 py-1.5 border border-border text-xs"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleRechazar}
+                disabled={rejecting}
+                className="inline-flex items-center gap-1 min-h-[44px] px-3 py-1.5 bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                {rejecting ? <Loader2 size={12} className="animate-spin" /> : null}
+                Confirmar rechazo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <p
+            className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+            style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
+          >
+            ⚠ {error}
+          </p>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }

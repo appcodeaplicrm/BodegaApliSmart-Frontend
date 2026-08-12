@@ -68,29 +68,29 @@ export function Pagination({
     <div
       className={
         embedded
-          ? 'flex flex-wrap items-center justify-between gap-3 py-2'
-          : 'flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-border bg-muted/20'
+          ? 'flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3 py-2'
+          : 'flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-3 border-t border-border bg-muted/20'
       }
     >
-      {/* Izquierda: "Mostrando X-Y de Z" (opcional, el padre puede mostrarlo) */}
-      {showRange && (
-        <div
-          className="text-[11px] text-muted-foreground tracking-wider uppercase"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-        >
-          Mostrando {first}-{last} de {total}
+      {/* Centro: botones de página
+          En mobile esta fila va PRIMERO y ocupa full-width para que
+          los ‹ ‹ 1 2 3 … N › › tengan todo el espacio y no se
+          monten con el range ni el pageSize. Los ‹‹ y ›› (saltar a
+          primera/última) solo aparecen en sm+ para no saturar mobile. */}
+      <div
+        className="flex items-center gap-1 justify-center sm:justify-start order-1"
+        role="navigation"
+        aria-label="Paginación"
+      >
+        <div className="hidden sm:block">
+          <PageBtn
+            disabled={disabled || page <= 1}
+            onClick={() => go(1)}
+            aria-label="Primera página"
+          >
+            <ChevronsLeft size={13} />
+          </PageBtn>
         </div>
-      )}
-
-      {/* Centro: botones de página */}
-      <div className="flex items-center gap-1">
-        <PageBtn
-          disabled={disabled || page <= 1}
-          onClick={() => go(1)}
-          aria-label="Primera página"
-        >
-          <ChevronsLeft size={13} />
-        </PageBtn>
         <PageBtn
           disabled={disabled || page <= 1}
           onClick={() => go(page - 1)}
@@ -113,7 +113,9 @@ export function Pagination({
               key={p}
               onClick={() => go(p)}
               disabled={disabled}
-              className={`min-w-[28px] h-7 px-2 text-xs border transition-colors ${
+              aria-current={p === page ? 'page' : undefined}
+              aria-label={`Página ${p}`}
+              className={`min-w-[36px] min-h-[36px] sm:min-w-[28px] sm:min-h-[28px] px-2 text-xs border transition-colors ${
                 p === page
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-card text-foreground border-border hover:border-foreground/40'
@@ -132,41 +134,56 @@ export function Pagination({
         >
           <ChevronRight size={13} />
         </PageBtn>
-        <PageBtn
-          disabled={disabled || page >= safeTotalPages}
-          onClick={() => go(safeTotalPages)}
-          aria-label="Última página"
-        >
-          <ChevronsRight size={13} />
-        </PageBtn>
+        <div className="hidden sm:block">
+          <PageBtn
+            disabled={disabled || page >= safeTotalPages}
+            onClick={() => go(safeTotalPages)}
+            aria-label="Última página"
+          >
+            <ChevronsRight size={13} />
+          </PageBtn>
+        </div>
       </div>
 
-      {/* Derecha: pageSize */}
-      {!hidePageSize && onPageSizeChange && (
-        <div className="flex items-center gap-2">
-          <label
-            htmlFor="pageSize"
-            className="text-[10px] text-muted-foreground tracking-widest uppercase"
+      {/* Fila 2 en mobile: range (izq) + pageSize (der).
+          En desktop vuelven a la misma fila que los botones (sm:order-*). */}
+      <div className="flex items-center justify-between gap-2 order-2 w-full sm:w-auto sm:order-2">
+        {showRange && (
+          <div
+            className="text-[11px] text-muted-foreground tracking-wider uppercase truncate"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
-            Por página
-          </label>
-          <select
-            id="pageSize"
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            disabled={disabled}
-            className="bg-muted border border-border text-foreground text-xs px-2 py-1 outline-none focus:border-primary/60 disabled:opacity-50"
-            style={{ borderRadius: '0.15rem', fontFamily: "'JetBrains Mono', monospace" }}
-          >
-            {pageSizeOptions.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+            {first}-{last} de {total}
+          </div>
+        )}
+
+        {/* Derecha: pageSize */}
+        {!hidePageSize && onPageSizeChange && (
+          <div className="flex items-center gap-2 ml-auto">
+            <label
+              htmlFor="pageSize"
+              className="text-[10px] text-muted-foreground tracking-widest uppercase"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              Por pág.
+            </label>
+            <select
+              id="pageSize"
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              disabled={disabled}
+              className="bg-muted border border-border text-foreground text-xs px-2 min-h-[36px] sm:min-h-[32px] outline-none focus:border-primary/60 disabled:opacity-50"
+              style={{ borderRadius: '0.15rem', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {pageSizeOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -187,7 +204,7 @@ function PageBtn({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      className="w-7 h-7 inline-flex items-center justify-center text-muted-foreground border border-border bg-card hover:border-foreground/40 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      className="min-w-[36px] min-h-[36px] sm:min-w-[28px] sm:min-h-[28px] inline-flex items-center justify-center text-muted-foreground border border-border bg-card hover:border-foreground/40 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
       style={{ borderRadius: '0.15rem' }}
     >
       {children}

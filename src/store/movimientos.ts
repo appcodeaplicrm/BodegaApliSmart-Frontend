@@ -25,6 +25,8 @@ export type Movimiento = {
   tipoMovimiento: { id: string; nombre: string; signo: string }
   bodegaOrigen: { id: string; nombre: string } | null
   bodegaDestino: { id: string; nombre: string } | null
+  /** Si este movimiento fue generado por una Compra, referencia a esa Compra. */
+  compra?: { id: string; codigo: string } | null
 }
 
 type Estado =
@@ -60,6 +62,11 @@ export type PageResult<T> = {
 let estado: Estado = { status: 'idle' }
 let cacheSnapshot: Estado = estado
 let tiposCache: TipoMovimiento[] | null = null
+// Última query ejecutada, para poder re-ejecutarla desde un evento
+// realtime (ej: cuando llega 'movimiento.created', hacemos refetch de
+// la página actual en vez de insertar el payload tal cual, porque el
+// socket emite una versión "delgada" sin todos los campos que la UI lee).
+let ultimaQuery: MovimientosQuery | null = null
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -106,6 +113,7 @@ export const movimientosStore = {
 
   async cargarPaginado(query: MovimientosQuery): Promise<PageResult<Movimiento>> {
     setEstado({ status: 'cargando' })
+    ultimaQuery = query
     try {
       const params = new URLSearchParams()
       if (query.bodegaId) params.set('bodegaId', query.bodegaId)
@@ -130,6 +138,18 @@ export const movimientosStore = {
       setEstado({ status: 'error', mensaje })
       throw err
     }
+  },
+
+  /**
+   * Re-ejecuta la última query usada. Se usa desde el realtime
+   * provider cuando llega un evento que afecta la lista actual
+   * (ej: 'movimiento.created' → refetch para que aparezca el nuevo
+   * movimiento con la forma completa, no con el payload "delgado"
+   * del socket).
+   */
+  async refetchActual(): Promise<PageResult<Movimiento> | null> {
+    if (!ultimaQuery) return null
+    return this.cargarPaginado(ultimaQuery)
   },
 
   async crear(input: {

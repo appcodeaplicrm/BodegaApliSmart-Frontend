@@ -21,6 +21,7 @@ import { productosStore, uploadsService, type Producto } from '../store/producto
 import { EditarProductoModal } from './EditarProductoModal'
 import { useAuth } from '../store/auth'
 import { imageUrl } from '../lib/apiBase'
+import { Modal } from './Modal'
 
 type Props = {
   producto: Producto
@@ -112,93 +113,79 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
   const proveedores = p.proveedores ?? []
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-2xl max-h-[92vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 p-5 border-b border-border shrink-0">
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-            <div className="w-10 h-10 bg-primary/15 flex items-center justify-center shrink-0">
-              <Package size={20} className="text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2
-                className="text-2xl uppercase text-foreground leading-none truncate"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                {p.nombre}
-              </h2>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span
-                  className="text-[10px] text-muted-foreground"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  {p.codigo}
-                </span>
-                <span
-                  className={`text-[9px] uppercase tracking-widest px-2 py-0.5 border ${
-                    p.activo
-                      ? 'text-secondary border-secondary/30'
-                      : 'text-primary border-primary/30'
-                  }`}
-                  style={{
-                    borderRadius: '0.125rem',
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                >
-                  {p.activo ? 'Activo' : 'Inactivo'}
-                </span>
-                {bajo && (
-                  <span
-                    className="text-[9px] uppercase tracking-widest px-2 py-0.5 border border-amber-500/30 text-amber-400"
-                    style={{ borderRadius: '0.125rem', fontFamily: "'JetBrains Mono', monospace" }}
-                  >
-                    {stockTotal === 0 ? 'Sin stock' : 'Stock bajo'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
+    <>
+      <Modal
+        open
+        onClose={onClose}
+        title={p.nombre}
+        description={`SKU ${p.codigo}`}
+        icon={<Package size={16} className="text-primary" />}
+        size="lg"
+        footer={
+          <div className="flex items-center gap-2 flex-wrap">
             {puedeEditar && (
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                aria-label="Editar producto"
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground text-sm hover:border-primary/40 hover:text-primary transition-colors"
+                style={{ borderRadius: '0.25rem' }}
                 title="Editar"
               >
-                <Pencil size={15} />
+                <Pencil size={14} />
+                Editar
               </button>
             )}
             {puedeEliminar && (
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="p-2 text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-                aria-label="Eliminar producto"
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground text-sm hover:border-primary/40 hover:text-primary transition-colors"
+                style={{ borderRadius: '0.25rem' }}
                 title="Eliminar"
               >
-                <Trash2 size={15} />
+                <Trash2 size={14} />
+                Eliminar
               </button>
             )}
+            <div className="flex-1" />
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              aria-label="Cerrar"
+              className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
+              style={{ borderRadius: '0.25rem' }}
             >
-              <X size={18} />
+              <CircleCheck size={14} />
+              Cerrar
             </button>
           </div>
-        </div>
+        }
+      >
+        <div className="p-5 space-y-5">
+          {/* Status badges (movidos del header viejo al body) */}
+          <div className="flex items-center gap-2 flex-wrap -mt-1">
+            <span
+              className={`text-[9px] uppercase tracking-widest px-2 py-0.5 border ${
+                p.activo
+                  ? 'text-secondary border-secondary/30'
+                  : 'text-primary border-primary/30'
+              }`}
+              style={{
+                borderRadius: '0.125rem',
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              {p.activo ? 'Activo' : 'Inactivo'}
+            </span>
+            {bajo && (
+              <span
+                className="text-[9px] uppercase tracking-widest px-2 py-0.5 border border-amber-500/30 text-amber-400"
+                style={{ borderRadius: '0.125rem', fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {stockTotal === 0 ? 'Sin stock' : 'Stock bajo'}
+              </span>
+            )}
+          </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {loading && !full ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 size={20} className="text-primary animate-spin" />
@@ -391,7 +378,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
                           href={imageUrl(d.imageUrl ?? d.url) ?? '#'}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          className="min-w-[44px] min-h-[44px] p-2.5 text-muted-foreground hover:text-foreground transition-colors inline-flex items-center justify-center"
                           aria-label="Abrir en pestaña nueva"
                         >
                           <ExternalLink size={14} />
@@ -399,7 +386,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
                         <a
                           href={imageUrl(d.imageUrl ?? d.url) ?? '#'}
                           download={d.nombre}
-                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          className="min-w-[44px] min-h-[44px] p-2.5 text-muted-foreground hover:text-foreground transition-colors inline-flex items-center justify-center"
                           aria-label="Descargar"
                         >
                           <Download size={14} />
@@ -409,7 +396,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
                             type="button"
                             onClick={() => handleEliminarDoc(d.id)}
                             disabled={deletingId === d.id}
-                            className="p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                            className="min-w-[44px] min-h-[44px] p-2.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 inline-flex items-center justify-center"
                             aria-label="Eliminar"
                           >
                             {deletingId === d.id ? (
@@ -427,19 +414,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
             </>
           )}
         </div>
-
-        <div className="p-4 border-t border-border flex items-center justify-end shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            <CircleCheck size={14} />
-            Cerrar
-          </button>
-        </div>
-      </div>
+      </Modal>
 
       {editing && full && (
         <EditarProductoModal
@@ -450,40 +425,20 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
       )}
 
       {confirmDelete && (
-        <div
-          className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => !deleting && setConfirmDelete(false)}
-        >
-          <div
-            className="bg-card border border-border w-full max-w-sm p-5 space-y-4"
-            style={{ borderRadius: '0.25rem' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary/15 flex items-center justify-center shrink-0">
-                <Trash2 size={18} className="text-primary" />
-              </div>
-              <div>
-                <h3
-                  className="text-lg uppercase text-foreground"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-                >
-                  ¿Eliminar producto?
-                </h3>
-                <p
-                  className="text-xs text-muted-foreground mt-0.5"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}
-                >
-                  Se va a borrar "{p.nombre}" junto con su stock, alertas y documentos. No se puede deshacer.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
+        <Modal
+          open
+          onClose={() => !deleting && setConfirmDelete(false)}
+          title="¿Eliminar producto?"
+          description={`Se va a borrar "${p.nombre}" junto con su stock, alertas y documentos. No se puede deshacer.`}
+          icon={<Trash2 size={16} className="text-primary" />}
+          size="sm"
+          footer={
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
                 disabled={deleting}
-                className="flex-1 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+                className="flex-1 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
                 style={{ borderRadius: '0.25rem' }}
               >
                 Cancelar
@@ -492,7 +447,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
                 type="button"
                 onClick={handleEliminarProducto}
                 disabled={deleting}
-                className="flex-1 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                className="flex-1 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
                 style={{ borderRadius: '0.25rem' }}
               >
                 {deleting ? (
@@ -508,10 +463,19 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
                 )}
               </button>
             </div>
+          }
+        >
+          <div className="p-5">
+            <p
+              className="text-xs text-muted-foreground"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              Esta acción es permanente.
+            </p>
           </div>
-        </div>
+        </Modal>
       )}
-    </div>
+    </>
   )
 }
 

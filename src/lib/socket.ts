@@ -13,7 +13,7 @@
  *  - API minimalista: `getSocket()` devuelve la instancia única; los
  *    hooks (useRealtimeEvent) se suscriben a canales.
  *
- * El token se guarda en sessionStorage (decisión documentada:权衡权衡
+ * El token se guarda en sessionStorage (decisión documentada: 权衡权衡
  * entre complejidad y seguridad. Migrable a tickets one-time sin
  * cambiar la API de este módulo).
  *

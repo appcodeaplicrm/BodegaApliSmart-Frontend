@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { X, Plus, Trash2, ClipboardList, Loader2, Package, Boxes } from 'lucide-react'
+import { Plus, Trash2, ClipboardList, Loader2, Package, Boxes } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useProductos, productosStore, type ProductoListItem } from '../store/productos'
 import { useKits, kitsStore, type Kit } from '../store/kits'
 import { useBodegas, bodegasStore } from '../store/bodegas'
 import { api, ApiError } from '../lib/api'
+import { Modal } from './Modal'
+import { SelectMobile } from './SelectMobile'
 
 type ItemKind = 'producto' | 'kit'
 
@@ -171,304 +173,278 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
   }
 
   const inputClass =
-    'w-full px-3 py-2.5 bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors'
+    'w-full px-3 py-2.5 min-h-[44px] bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors'
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-primary/15 flex items-center justify-center">
-              <ClipboardList size={14} className="text-primary" />
-            </div>
-            <h2
-              className="text-lg uppercase text-foreground"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
-            >
-              Solicitud de Recursos
-            </h2>
-          </div>
+    <Modal
+      open
+      onClose={onClose}
+      title="Solicitud de Recursos"
+      description={`${bodegaNombre} · ${operadorNombre} (${rol})`}
+      icon={<ClipboardList size={16} className="text-primary" />}
+      size="md"
+      footer={
+        <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Cerrar"
+            disabled={submitting}
+            className="flex-1 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+            style={{ borderRadius: '0.25rem' }}
           >
-            <X size={18} />
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="crear-orden-form"
+            disabled={submitting}
+            className="flex-1 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            {submitting ? (
+              <>
+                <Loader2 size={13} className="animate-spin" />
+                Enviando…
+              </>
+            ) : (
+              'Enviar solicitud'
+            )}
           </button>
         </div>
+      }
+    >
+      <form id="crear-orden-form" onSubmit={handleSubmit} className="p-5 space-y-5">
+        <div className="grid grid-cols-2 gap-3">
+          <InfoCell label="Operador" value={operadorNombre} sub={rol} />
+          <InfoCell label="Bodega" value={bodegaNombre} />
+        </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <InfoCell label="Operador" value={operadorNombre} sub={rol} />
-            <InfoCell label="Bodega" value={bodegaNombre} />
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span
+              className="text-xs text-muted-foreground tracking-widest uppercase"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              Ítems de la orden
+            </span>
+            <button
+              type="button"
+              onClick={addItem}
+              className="inline-flex items-center gap-1 min-h-[44px] px-2 text-xs text-primary hover:underline"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              <Plus size={12} />
+              Agregar ítem
+            </button>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span
-                className="text-xs text-muted-foreground tracking-widest uppercase"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          <div className="space-y-2">
+            {items.map((it, idx) => (
+              <div
+                key={it.uid}
+                className="p-2 bg-muted border border-border"
+                style={{ borderRadius: '0.25rem' }}
               >
-                Ítems de la orden
-              </span>
-              <button
-                type="button"
-                onClick={addItem}
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-              >
-                <Plus size={12} />
-                Agregar ítem
-              </button>
-            </div>
+                {/* Fila 1: número + toggle + input cantidad + trash */}
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-[10px] text-muted-foreground w-5 shrink-0"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
 
-            <div className="space-y-2">
-              {items.map((it, idx) => (
-                <div
-                  key={it.uid}
-                  className="p-2 bg-muted border border-border"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-[10px] text-muted-foreground w-5 shrink-0"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    >
-                      {String(idx + 1).padStart(2, '0')}
-                    </span>
-
-                    {/* Toggle Producto / Kit */}
-                    <div
-                      className="flex border border-border"
-                      style={{ borderRadius: '0.25rem' }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setItem(it.uid, { kind: 'producto', kitId: '' })
-                        }
-                        className={`px-2 py-1.5 text-[11px] inline-flex items-center gap-1 transition-colors ${
-                          it.kind === 'producto'
-                            ? 'bg-primary/15 text-primary'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                      >
-                        <Package size={11} /> Producto
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setItem(it.uid, { kind: 'kit', productoId: '' })
-                        }
-                        className={`px-2 py-1.5 text-[11px] inline-flex items-center gap-1 transition-colors ${
-                          it.kind === 'kit'
-                            ? 'bg-secondary/15 text-secondary'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                      >
-                        <Boxes size={11} /> Kit
-                      </button>
-                    </div>
-
-                    {it.kind === 'producto' ? (
-                      <select
-                        value={it.productoId}
-                        onChange={(e) => setItem(it.uid, { productoId: e.target.value })}
-                        className="flex-1 min-w-0 px-2 py-1.5 bg-background border border-border text-sm text-foreground outline-none focus:border-primary/60"
-                        style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-                        disabled={productosLoading}
-                      >
-                        <option value="" disabled>
-                          {productosLoading ? 'Cargando productos…' : 'Seleccionar producto…'}
-                        </option>
-                        {productos.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <select
-                        value={it.kitId}
-                        onChange={(e) => setItem(it.uid, { kitId: e.target.value })}
-                        className="flex-1 min-w-0 px-2 py-1.5 bg-background border border-border text-sm text-foreground outline-none focus:border-primary/60"
-                        style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-                        disabled={kitsLoading}
-                      >
-                        <option value="" disabled>
-                          {kitsLoading ? 'Cargando kits…' : 'Seleccionar kit…'}
-                        </option>
-                        {kits.map((k) => (
-                          <option key={k.id} value={k.id}>
-                            {k.nombre} ({k.codigo})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    <input
-                      type="number"
-                      min={1}
-                      value={it.cantidad}
-                      onChange={(e) => setItem(it.uid, { cantidad: Number(e.target.value) })}
-                      className="w-20 px-2 py-1.5 bg-background border border-border text-sm text-foreground text-center outline-none focus:border-primary/60"
-                      style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
-                    />
+                  {/* Toggle Producto / Kit */}
+                  <div
+                    className="flex border border-border flex-1 sm:flex-initial"
+                    style={{ borderRadius: '0.25rem' }}
+                  >
                     <button
                       type="button"
-                      onClick={() => removeItem(it.uid)}
-                      disabled={items.length === 1}
-                      className="p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                      aria-label="Eliminar ítem"
+                      onClick={() =>
+                        setItem(it.uid, { kind: 'producto', kitId: '' })
+                      }
+                      className={`flex-1 sm:flex-initial px-2 py-1.5 min-h-[44px] text-[11px] inline-flex items-center justify-center gap-1 transition-colors ${
+                        it.kind === 'producto'
+                          ? 'bg-primary/15 text-primary'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
                     >
-                      <Trash2 size={14} />
+                      <Package size={11} /> Producto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setItem(it.uid, { kind: 'kit', productoId: '' })
+                      }
+                      className={`flex-1 sm:flex-initial px-2 py-1.5 min-h-[44px] text-[11px] inline-flex items-center justify-center gap-1 transition-colors ${
+                        it.kind === 'kit'
+                          ? 'bg-secondary/15 text-secondary'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      <Boxes size={11} /> Kit
                     </button>
                   </div>
 
-                  {/* Si es kit, mostramos el desglose de productos que tiene */}
-                  {it.kind === 'kit' && it.kitId && (() => {
-                    const k = kits.find((x) => x.id === it.kitId)
-                    if (!k) return null
-                    return (
-                      <div
-                        className="mt-2 ml-7 p-2 bg-background border border-border"
-                        style={{ borderRadius: '0.25rem' }}
-                      >
-                        <div
-                          className="text-[10px] text-muted-foreground mb-1"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                        >
-                          El kit incluye:
-                        </div>
-                        <ul
-                          className="space-y-0.5"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                        >
-                          {k.items.map((ki) => (
-                            <li
-                              key={ki.id}
-                              className="text-[10px] text-foreground flex items-center justify-between"
-                            >
-                              <span className="truncate">· {ki.producto.nombre}</span>
-                              <span className="text-muted-foreground">
-                                ×{ki.cantidad} por kit
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )
-                  })()}
+                  <input
+                    type="number"
+                    min={1}
+                    value={it.cantidad}
+                    onChange={(e) => setItem(it.uid, { cantidad: Number(e.target.value) })}
+                    className="w-20 min-h-[44px] px-2 py-1.5 bg-background border border-border text-sm text-foreground text-center outline-none focus:border-primary/60"
+                    style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(it.uid)}
+                    disabled={items.length === 1}
+                    className="min-w-[44px] min-h-[44px] p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center"
+                    aria-label="Eliminar ítem"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-              ))}
-            </div>
 
-            {!productosLoading && !kitsLoading && productos.length === 0 && kits.length === 0 && (
-              <p
-                className="mt-2 text-[11px] text-muted-foreground"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-              >
-                ⚠ Esta bodega no tiene productos ni kits registrados todavía.
-              </p>
-            )}
+                {/* Fila 2: selector (full-width). En mobile baja a una línea
+                    completa para que el botón custom del SelectMobile tenga
+                    todo el ancho del row. */}
+                <div className="mt-2">
+                  {it.kind === 'producto' ? (
+                    <SelectMobile
+                      value={it.productoId}
+                      onChange={(v) => setItem(it.uid, { productoId: v })}
+                      options={productos.map((p) => ({ value: p.id, label: p.nombre }))}
+                      placeholder={
+                        productosLoading ? 'Cargando productos…' : 'Seleccionar producto…'
+                      }
+                      disabled={productosLoading}
+                      label="Producto"
+                    />
+                  ) : (
+                    <SelectMobile
+                      value={it.kitId}
+                      onChange={(v) => setItem(it.uid, { kitId: v })}
+                      options={kits.map((k) => ({
+                        value: k.id,
+                        label: `${k.nombre} (${k.codigo})`,
+                      }))}
+                      placeholder={kitsLoading ? 'Cargando kits…' : 'Seleccionar kit…'}
+                      disabled={kitsLoading}
+                      label="Kit"
+                    />
+                  )}
+                </div>
+
+                {/* Si es kit, mostramos el desglose de productos que tiene */}
+                {it.kind === 'kit' && it.kitId && (() => {
+                  const k = kits.find((x) => x.id === it.kitId)
+                  if (!k) return null
+                  return (
+                    <div
+                      className="mt-2 ml-7 p-2 bg-background border border-border"
+                      style={{ borderRadius: '0.25rem' }}
+                    >
+                      <div
+                        className="text-[10px] text-muted-foreground mb-1"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        El kit incluye:
+                      </div>
+                      <ul
+                        className="space-y-0.5"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        {k.items.map((ki) => (
+                          <li
+                            key={ki.id}
+                            className="text-[10px] text-foreground flex items-center justify-between"
+                          >
+                            <span className="truncate">· {ki.producto.nombre}</span>
+                            <span className="text-muted-foreground">
+                              ×{ki.cantidad} por kit
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })()}
+              </div>
+            ))}
           </div>
 
-          <div>
-            <label
-              className="block text-xs text-muted-foreground tracking-widest uppercase mb-1.5"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Motivo / Referencia
-            </label>
-            <input
-              type="text"
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: Stock bajo en línea, reposición turno tarde…"
-              className={inputClass}
-              style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-            />
-          </div>
-
-          <div
-            className="bg-muted border border-border p-3"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            <div
-              className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Resumen
-            </div>
-            <div className="text-sm text-foreground">
-              {items.filter((it) => it.productoId).length}{' '}
-              {items.filter((it) => it.productoId).length === 1 ? 'producto' : 'productos'} ·{' '}
-              {items.reduce((acc, it) => acc + (it.productoId ? it.cantidad : 0), 0)} unidades totales
-            </div>
-            {items.some((it) => it.productoId) && (
-              <ul
-                className="mt-2 text-xs text-muted-foreground space-y-0.5"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-              >
-                {items
-                  .filter((it) => (it.kind === 'producto' ? it.productoId : it.kitId))
-                  .map((it) => (
-                    <li key={it.uid}>
-                      · {it.kind === 'kit' ? '📦 ' : ''}
-                      {productoLabel(it)} × {it.cantidad}
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </div>
-
-          {error && (
+          {!productosLoading && !kitsLoading && productos.length === 0 && kits.length === 0 && (
             <p
-              className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
-              style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
+              className="mt-2 text-[11px] text-muted-foreground"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-              ⚠ {error}
+              ⚠ Esta bodega no tiene productos ni kits registrados todavía.
             </p>
           )}
+        </div>
 
-          <div className="flex items-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="flex-1 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
-              style={{ borderRadius: '0.25rem' }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-              style={{ borderRadius: '0.25rem' }}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={13} className="animate-spin" />
-                  Enviando…
-                </>
-              ) : (
-                'Enviar solicitud'
-              )}
-            </button>
+        <div>
+          <label
+            className="block text-xs text-muted-foreground tracking-widest uppercase mb-1.5"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Motivo / Referencia
+          </label>
+          <input
+            type="text"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ej: Stock bajo en línea, reposición turno tarde…"
+            className={inputClass}
+            style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+          />
+        </div>
+
+        <div
+          className="bg-muted border border-border p-3"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <div
+            className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Resumen
           </div>
-        </form>
-      </div>
-    </div>
+          <div className="text-sm text-foreground">
+            {items.filter((it) => it.productoId).length}{' '}
+            {items.filter((it) => it.productoId).length === 1 ? 'producto' : 'productos'} ·{' '}
+            {items.reduce((acc, it) => acc + (it.productoId ? it.cantidad : 0), 0)} unidades totales
+          </div>
+          {items.some((it) => it.productoId) && (
+            <ul
+              className="mt-2 text-xs text-muted-foreground space-y-0.5"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {items
+                .filter((it) => (it.kind === 'producto' ? it.productoId : it.kitId))
+                .map((it) => (
+                  <li key={it.uid}>
+                    · {it.kind === 'kit' ? '📦 ' : ''}
+                    {productoLabel(it)} × {it.cantidad}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+
+        {error && (
+          <p
+            className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+            style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
+          >
+            ⚠ {error}
+          </p>
+        )}
+      </form>
+    </Modal>
   )
 }
 

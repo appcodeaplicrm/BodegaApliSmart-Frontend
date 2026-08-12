@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
-  X,
   CheckCircle2,
   XCircle,
   Loader2,
   Camera,
   Send,
   Truck,
+  Undo2,
 } from 'lucide-react'
 import {
   devolucionesStore,
@@ -20,6 +20,7 @@ import { useAuth } from '../store/auth'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { imageUrl } from '../lib/apiBase'
 import { DevolucionWizard } from './DevolucionWizard'
+import { Modal } from './Modal'
 
 type Props = {
   devolucion: DevolucionListItem
@@ -86,8 +87,15 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
 
   if (cargando) {
     return (
-      <Modal onClose={onClose} title={devolucion.codigo}>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground p-6">
+      <Modal
+        open
+        onClose={onClose}
+        title="Detalle de la devolución"
+        description={devolucion.codigo}
+        icon={<Undo2 size={16} className="text-primary" />}
+        size="lg"
+      >
+        <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={14} className="animate-spin" /> Cargando detalle…
         </div>
       </Modal>
@@ -96,9 +104,16 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
 
   if (errorCarga) {
     return (
-      <Modal onClose={onClose} title={devolucion.codigo}>
+      <Modal
+        open
+        onClose={onClose}
+        title="Detalle de la devolución"
+        description={devolucion.codigo}
+        icon={<Undo2 size={16} className="text-primary" />}
+        size="lg"
+      >
         <p
-          className="text-sm text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+          className="m-5 text-sm text-primary bg-primary/10 border border-primary/20 px-3 py-2"
           style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
         >
           ⚠ {errorCarga}
@@ -144,8 +159,15 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
   }
 
   return (
-    <Modal onClose={onClose} title={devolucion.codigo}>
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+    <Modal
+      open
+      onClose={onClose}
+      title="Detalle de la devolución"
+      description={devolucion.codigo}
+      icon={<Undo2 size={16} className="text-primary" />}
+      size="lg"
+    >
+      <div className="p-5 space-y-4">
         {/* Info general */}
         <div className="grid grid-cols-2 gap-3">
           <Cell label="Estado">
@@ -203,7 +225,7 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
             {puedeEnviarOperador && (
               <button
                 onClick={() => setWizardOperador(true)}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                 style={{ borderRadius: '0.25rem' }}
               >
                 <Send size={14} />
@@ -217,7 +239,7 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
             {puedeRecibirBodeguero && (
               <button
                 onClick={() => setWizardBodeguero(true)}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                 style={{ borderRadius: '0.25rem' }}
               >
                 <Camera size={14} />
@@ -366,54 +388,6 @@ function itemEstadoLabel(estado: EstadoDevolucionItem): string {
   if (estado === 'rechazado') return 'RECHAZADO'
   if (estado === 'en_transito') return 'EN TRÁNSITO'
   return 'PENDIENTE'
-}
-
-function Modal({
-  onClose,
-  title,
-  children,
-}: {
-  onClose: () => void
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-2xl max-h-[90vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div>
-            <div
-              className="text-[10px] text-muted-foreground tracking-widest uppercase"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              {title}
-            </div>
-            <h2
-              className="text-lg uppercase text-foreground mt-1"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
-            >
-              Detalle de la devolución
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Cerrar"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
 }
 
 function Cell({ label, children }: { label: string; children: React.ReactNode }) {

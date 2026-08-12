@@ -13,6 +13,7 @@ import {
   Upload,
   Plus,
   MapPin,
+  RotateCcw,
   CheckCircle2,
 } from 'lucide-react'
 import {
@@ -26,6 +27,7 @@ import { useMarcas, marcasStore } from '../store/marcas'
 import { useUbicaciones } from '../store/ubicaciones'
 import { useAuth } from '../store/auth'
 import { ModalCrearCatalogo } from './ModalCrearCatalogo'
+import { Modal } from './Modal'
 
 type DocUpload = {
   id: string
@@ -60,6 +62,10 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
   const [categoriaId, setCategoriaId] = useState('')
   const [proveedorId, setProveedorId] = useState('')
   const [marcaId, setMarcaId] = useState('')
+  // Política de devolución (Sprint 3 — sección 21 del .md).
+  // Default FALSE: producto consumible o no retornable. El bodeguero
+  // debe activarlo explícitamente para herramientas / cascos / etc.
+  const [admiteDevolucion, setAdmiteDevolucion] = useState(false)
   const [precio, setPrecio] = useState(0)
   const [stockMinimo, setStockMinimo] = useState(10)
   const [stockMaximo, setStockMaximo] = useState(0)
@@ -262,6 +268,8 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
         stockInicialUnidadId:
           stockInicial > 0 ? stockInicialUnidadId ?? unidadMedidaId : undefined,
         proveedores: proveedorId ? [{ proveedorId, precioCompra: 0 }] : undefined,
+        // Política de devolución.
+        admiteDevolucion,
       }
       const producto = await productosStore.crear(input)
 
@@ -293,7 +301,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
   }
 
   const inputClass =
-    'w-full px-3 py-2.5 bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors'
+    'w-full px-3 py-2.5 min-h-[44px] bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors'
 
   const unidades = unidadesState.status === 'listo' ? unidadesState.unidades : []
   const marcas = marcasLocal
@@ -301,46 +309,52 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
     ubicacionesState.status === 'listo' ? ubicacionesState.ubicaciones : []
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-2xl max-h-[92vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
+    <>
+      <Modal
+        open
+        onClose={onClose}
+        title="Nuevo Producto"
+        description="Indicá código, nombre y unidad base"
+        icon={<Package size={16} className="text-primary" />}
+        size="lg"
+        footer={
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary/15 flex items-center justify-center">
-              <Package size={18} className="text-primary" />
-            </div>
-            <div>
-              <h2
-                className="text-xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                Nuevo Producto
-              </h2>
-              <p
-                className="mt-1 text-xs text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                Indicá código, nombre y unidad base
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              <X size={14} />
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="nuevo-producto-form"
+              disabled={submitting}
+              className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Creando…
+                </>
+              ) : (
+                <>
+                  <Package size={14} />
+                  Crear Producto
+                </>
+              )}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Cerrar"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
+        }
+      >
+        <form
+          id="nuevo-producto-form"
+          onSubmit={handleSubmit}
+          className="p-5 space-y-5"
+        >
           {/* ─── Identificación ─── */}
           <Section title="Identificación" icon={Tag}>
             <div className="space-y-3">
@@ -393,7 +407,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                     <button
                       type="button"
                       onClick={() => setCrearCategoria(true)}
-                      className="inline-flex items-center gap-1 px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
                       style={{
                         borderRadius: '0.25rem',
                         fontFamily: "'JetBrains Mono', monospace",
@@ -421,7 +435,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                     <button
                       type="button"
                       onClick={() => setCrearMarca(true)}
-                      className="inline-flex items-center gap-1 px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
                       style={{
                         borderRadius: '0.25rem',
                         fontFamily: "'JetBrains Mono', monospace",
@@ -451,7 +465,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                   <button
                     type="button"
                     onClick={() => setCrearProveedor(true)}
-                    className="inline-flex items-center gap-1 px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
                     style={{
                       borderRadius: '0.25rem',
                       fontFamily: "'JetBrains Mono', monospace",
@@ -461,6 +475,48 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                     <Plus size={12} /> Crear
                   </button>
                 </div>
+              </Field>
+
+              {/* Política de devolución (Sprint 3 — sección 21 del .md).
+                  El bodeguero define una sola vez si el producto debe
+                  devolverse después de su uso. Default FALSE (consumible
+                  o no retornable: tornillos, cinta, lubricante). */}
+              <Field
+                label="Política de devolución"
+                icon={RotateCcw}
+                hint={
+                  admiteDevolucion
+                    ? 'El técnico deberá devolver este producto después de su uso.'
+                    : 'Este producto se considera consumible o no retornable.'
+                }
+              >
+                <label className="flex items-center gap-3 cursor-pointer select-none min-h-[44px]">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={admiteDevolucion}
+                    onClick={() => setAdmiteDevolucion((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center transition-colors ${
+                      admiteDevolucion ? 'bg-secondary' : 'bg-muted'
+                    }`}
+                    style={{ borderRadius: '0.25rem' }}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform bg-foreground transition-transform ${
+                        admiteDevolucion ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                      style={{ borderRadius: '0.15rem' }}
+                    />
+                  </button>
+                  <div className="text-sm">
+                    <div
+                      className="text-foreground font-semibold"
+                      style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                    >
+                      {admiteDevolucion ? 'Admite devolución' : 'No admite devolución'}
+                    </div>
+                  </div>
+                </label>
               </Field>
             </div>
           </Section>
@@ -527,7 +583,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                 </Field>
               </div>
 
-              <Field label="Ubicación (opcional)" icon={MapPin}>
+              <Field label="Ubicación dentro de bodega (opcional)" icon={MapPin}>
                 <select
                   value={ubicacionId ?? ''}
                   onChange={(e) => setUbicacionId(e.target.value || null)}
@@ -635,7 +691,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                     <button
                       type="button"
                       onClick={() => removeDoc(d.id)}
-                      className="text-muted-foreground hover:text-primary transition-colors p-1"
+                      className="text-muted-foreground hover:text-primary transition-colors min-w-[44px] min-h-[44px] p-1 inline-flex items-center justify-center"
                       aria-label="Quitar"
                     >
                       <X size={13} />
@@ -684,38 +740,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
             </p>
           )}
         </form>
-
-        <div className="p-4 border-t border-border flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            <X size={14} />
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e as unknown as FormEvent)}
-            disabled={submitting}
-            className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            {submitting ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                Creando…
-              </>
-            ) : (
-              <>
-                <Package size={14} />
-                Crear Producto
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+      </Modal>
 
       {crearCategoria && (
         <ModalCrearCatalogo
@@ -771,7 +796,7 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
           onClose={() => setCrearProveedor(false)}
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -850,8 +875,8 @@ function DocButton({
       onClick={onClick}
       className={
         hasFile
-          ? 'inline-flex items-center justify-between gap-2 px-3 py-2 bg-emerald-500/15 border border-emerald-500/50 text-xs text-emerald-500 hover:border-emerald-500 transition-colors'
-          : 'inline-flex items-center gap-2 px-3 py-2 bg-card border border-border text-xs text-foreground hover:border-primary/40 transition-colors'
+          ? 'inline-flex items-center justify-between gap-2 min-h-[44px] px-3 py-2 bg-emerald-500/15 border border-emerald-500/50 text-xs text-emerald-500 hover:border-emerald-500 transition-colors'
+          : 'inline-flex items-center gap-2 min-h-[44px] px-3 py-2 bg-card border border-border text-xs text-foreground hover:border-primary/40 transition-colors'
       }
       style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
       title={hasFile ? `${count} archivo(s) cargado(s)` : `Agregar ${label.toLowerCase()}`}

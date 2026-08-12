@@ -13,6 +13,18 @@ const STORAGE_KEY = 'winerysmart:bodegaActivaId'
  */
 type Estado = { bodegaId: string | null }
 
+/** Callback disparado cuando cambia la bodega activa.
+ *  Recibe { anterior, nueva, nombreNueva } (nombre puede ser null si
+ *  no se conoce en el momento del set). Usado por ToastBridge para
+ *  mostrar el toast de éxito.
+ */
+export type CambioBodega = {
+  anterior: string | null
+  nueva: string | null
+  nombreNueva: string | null
+}
+type CambioListener = (cambio: CambioBodega) => void
+
 function read(): string | null {
   if (typeof window === 'undefined') return null
   try {
@@ -35,6 +47,7 @@ function write(value: string | null) {
 let estado: Estado = { bodegaId: read() }
 let cacheSnapshot: Estado = estado
 const listeners = new Set<() => void>()
+const cambioListeners = new Set<CambioListener>()
 
 function emit() {
   listeners.forEach((l) => l())
@@ -71,16 +84,53 @@ export const bodegaActivaStore = {
     return estado.bodegaId
   },
 
-  /** Cambia la bodega activa y persiste en localStorage. */
-  set(bodegaId: string | null) {
+  /**
+   * Cambia la bodega activa y persiste en localStorage.
+   *
+   * Si se pasa `nombre`, también se dispara el evento de cambio
+   * con el nombre incluido (usado por el ToastBridge para mostrar
+   * el toast de éxito al cambiar de bodega).
+   */
+  set(bodegaId: string | null, nombre?: string | null) {
+    const anterior = estado.bodegaId
+    if (anterior === bodegaId) return
     write(bodegaId)
     setEstado({ bodegaId })
+    // Notificar a los listeners de cambio
+    cambioListeners.forEach((l) => {
+      try {
+        l({ anterior, nueva: bodegaId, nombreNueva: nombre ?? null })
+      } catch {
+        /* un listener roto no puede tumbar al resto */
+      }
+    })
+  },
+
+  /**
+   * Suscribe un listener al evento de cambio de bodega activa.
+   * Se llama cuando se hace `set(...)` con un id distinto al actual.
+   * Devuelve la función para desuscribirse.
+   */
+  onCambio(l: CambioListener): () => void {
+    cambioListeners.add(l)
+    return () => {
+      cambioListeners.delete(l)
+    }
   },
 
   /** Resetea (se usa en logout). */
   reset() {
+    const anterior = estado.bodegaId
+    if (anterior === null) return
     write(null)
     setEstado({ bodegaId: null })
+    cambioListeners.forEach((l) => {
+      try {
+        l({ anterior, nueva: null, nombreNueva: null })
+      } catch {
+        /* ignore */
+      }
+    })
   },
 }
 

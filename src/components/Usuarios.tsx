@@ -13,6 +13,9 @@ import {
   Inbox,
   CircleAlert,
   RotateCcw,
+  Mail,
+  Building2,
+  ChevronRight,
 } from 'lucide-react'
 import {
   useUsuarios,
@@ -28,6 +31,7 @@ import { PageHeader } from './PageHeader'
 import { permisosStore } from '../store/permisos'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { Pagination } from './Pagination'
+import { Modal } from './Modal'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -41,6 +45,7 @@ export function Usuarios() {
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [detalle, setDetalle] = useState<Usuario | null>(null)
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -137,7 +142,7 @@ export function Usuarios() {
         actions={
           <button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
             style={{ borderRadius: '0.25rem' }}
           >
             <Plus size={13} />
@@ -146,7 +151,7 @@ export function Usuarios() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatTile
             icon={Users}
@@ -173,6 +178,17 @@ export function Usuarios() {
             value={String(rolesEnUso)}
           />
         </div>
+
+        {/* Botón "Nuevo Usuario" mobile: debajo de las cards KPI.
+            En desktop el header ya tiene su botón, así que lo ocultamos. */}
+        <button
+          onClick={() => setCreating(true)}
+          className="lg:hidden w-full inline-flex items-center justify-center gap-1.5 min-h-11 bg-primary text-primary-foreground text-sm font-semibold active:scale-[0.98] transition-transform"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <Plus size={15} />
+          Nuevo Usuario
+        </button>
 
         <div className="relative">
           <Search
@@ -266,8 +282,44 @@ export function Usuarios() {
             className="bg-card border border-border overflow-hidden"
             style={{ borderRadius: '0.25rem' }}
           >
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            {/* MOBILE: lista de filas-tap que abren el modal de detalle */}
+            <ul className="sm:hidden divide-y divide-border">
+              {usuarios.map((u) => (
+                <li key={u.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDetalle(u)}
+                    className="w-full text-left p-3 flex items-center gap-3 hover:bg-muted/30 active:bg-muted/50 transition-colors"
+                  >
+                    <div className="w-9 h-9 bg-primary/15 flex items-center justify-center shrink-0">
+                      <span
+                        className="text-primary text-xs"
+                        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
+                      >
+                        {getInitials(u.nombre)}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="text-sm text-foreground truncate"
+                        style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}
+                      >
+                        {u.nombre}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        <RolBadgeSmall rol={u.rol} rolNombre={u.rolNombre} />
+                        <EstadoBadgeSmall estado={u.estado} />
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {/* DESKTOP: tabla con todas las columnas */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr
                     className="border-b border-border bg-muted/30"
@@ -377,7 +429,8 @@ export function Usuarios() {
         <CrearUsuarioModal
           onClose={() => setCreating(false)}
           onCreated={(u) => {
-            // El store ya inyectó el usuario en el snapshot; solo informamos.
+            setCreating(false)
+            cargar()
             console.info('Usuario creado:', u.nombre)
           }}
         />
@@ -397,58 +450,117 @@ export function Usuarios() {
         />
       )}
 
-      {confirmDelete && (
-        <div
-          className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => !deleting && setConfirmDelete(null)}
-        >
-          <div
-            className="bg-card border border-border w-full max-w-sm"
-            style={{ borderRadius: '0.25rem' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 bg-primary/15 flex items-center justify-center">
-                  <Trash2 size={15} className="text-primary" />
-                </div>
-                <h3
-                  className="text-lg uppercase text-foreground"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
-                >
-                  Eliminar usuario
-                </h3>
-              </div>
-              <p
-                className="text-sm text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
+      {detalle && (
+        <Modal
+          open
+          onClose={() => setDetalle(null)}
+          title={detalle.nombre}
+          description="Detalle del usuario"
+          icon={
+            <div className="w-9 h-9 bg-primary/15 flex items-center justify-center">
+              <span
+                className="text-primary text-sm"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
               >
-                ¿Seguro que querés eliminar a{' '}
-                <span className="text-foreground font-medium">{confirmDelete.nombre}</span>?
-                Esta acción no se puede deshacer.
-              </p>
-              {deleteError && (
-                <p
-                  className="mt-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
-                  style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
-                >
-                  ⚠ {deleteError}
-                </p>
-              )}
+                {getInitials(detalle.nombre)}
+              </span>
             </div>
-            <div className="flex items-center gap-2 p-4 border-t border-border">
+          }
+          size="md"
+          footer={
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
+                type="button"
+                onClick={() => {
+                  setEditing(detalle)
+                  setDetalle(null)
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-2 min-h-11 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <Pencil size={14} />
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setChangingPass(detalle)
+                  setDetalle(null)
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-2 min-h-11 border border-secondary/40 text-sm text-secondary hover:bg-secondary/10 transition-colors"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <KeyRound size={14} />
+                Cambiar contraseña
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDelete(detalle)
+                  setDetalle(null)
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-2 min-h-11 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <Trash2 size={14} />
+                Eliminar
+              </button>
+            </div>
+          }
+        >
+          <div className="px-4 sm:px-5 py-5 space-y-4">
+            <DetailField icon={<Mail size={14} />} label="Email">
+              <span
+                className="text-sm text-foreground break-all"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {detalle.email}
+              </span>
+            </DetailField>
+            {detalle.bodegaNombre && (
+              <DetailField icon={<Building2 size={14} />} label="Bodega">
+                <span
+                  className="text-sm text-foreground"
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}
+                >
+                  {detalle.bodegaNombre}
+                </span>
+              </DetailField>
+            )}
+            <DetailField icon={<ShieldCheck size={14} />} label="Rol">
+              <RolBadge rol={detalle.rol} rolNombre={detalle.rolNombre} />
+            </DetailField>
+            <DetailField icon={<UserCheck size={14} />} label="Estado">
+              <EstadoBadge estado={detalle.estado} />
+            </DetailField>
+          </div>
+        </Modal>
+      )}
+
+      {confirmDelete && (
+        <Modal
+          open
+          onClose={() => !deleting && setConfirmDelete(null)}
+          title="Eliminar usuario"
+          description={confirmDelete.nombre}
+          icon={<Trash2 size={16} className="text-primary" />}
+          size="sm"
+          footer={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
                 onClick={() => setConfirmDelete(null)}
                 disabled={deleting}
-                className="flex-1 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+                className="flex-1 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
                 style={{ borderRadius: '0.25rem' }}
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={() => void handleDelete(confirmDelete)}
                 disabled={deleting}
-                className="flex-1 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                className="flex-1 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
                 style={{ borderRadius: '0.25rem' }}
               >
                 {deleting ? (
@@ -464,8 +576,27 @@ export function Usuarios() {
                 )}
               </button>
             </div>
+          }
+        >
+          <div className="p-5 space-y-3">
+            <p
+              className="text-sm text-muted-foreground"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              ¿Seguro que querés eliminar a{' '}
+              <span className="text-foreground font-medium">{confirmDelete.nombre}</span>?
+              Esta acción no se puede deshacer.
+            </p>
+            {deleteError && (
+              <p
+                className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+                style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
+              >
+                ⚠ {deleteError}
+              </p>
+            )}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -565,6 +696,70 @@ function EstadoBadge({ estado }: { estado: EstadoUsuario }) {
     >
       {estado}
     </span>
+  )
+}
+
+function RolBadgeSmall({ rol, rolNombre }: { rol: RolUsuario; rolNombre?: string }) {
+  const label = rolNombre?.trim() || rol.toUpperCase() || '—'
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] border border-primary/40 text-primary bg-primary/10"
+      style={{
+        borderRadius: '0.15rem',
+        fontFamily: "'JetBrains Mono', monospace",
+        fontWeight: 500,
+        letterSpacing: '0.05em',
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+function EstadoBadgeSmall({ estado }: { estado: EstadoUsuario }) {
+  const isActive = estado === 'Activo'
+  return (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 text-[9px] border ${
+        isActive
+          ? 'border-secondary/40 text-secondary bg-secondary/10'
+          : 'border-muted text-muted-foreground bg-muted/30'
+      }`}
+      style={{
+        borderRadius: '0.15rem',
+        fontFamily: "'JetBrains Mono', monospace",
+        fontWeight: 500,
+      }}
+    >
+      {estado}
+    </span>
+  )
+}
+
+function DetailField({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-7 h-7 bg-muted flex items-center justify-center shrink-0 text-muted-foreground">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div
+          className="text-[10px] text-muted-foreground uppercase tracking-widest leading-none mb-1"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {label}
+        </div>
+        {children}
+      </div>
+    </div>
   )
 }
 

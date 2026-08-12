@@ -17,7 +17,7 @@
  * El evento recibido tiene la forma estandarizada:
  *   { id, type, adminId, bodegaId, timestamp, actorId, payload }
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { getSocket } from '../lib/socket'
 
 export type RealtimeEvent<T = unknown> = {
@@ -37,17 +37,45 @@ export function useRealtimeEvent<T = unknown>(
   handler: Handler<T>,
   options?: { skip?: boolean },
 ): void {
+  // Guardamos el handler en una ref para que la suscripción se haga UNA
+  // sola vez (al montar/cambiar eventType) pero el handler que se
+  // ejecuta sea siempre el más reciente. Esto evita:
+  //   - handlers "viejos" con state obsoleto (bodegaActiva, navigate, etc.)
+  //   - re-suscripciones innecesarias en cada render que duplicarían
+  //     listeners en el socket.
+  const handlerRef = useRef<Handler<T>>(handler)
+  useEffect(() => {
+    handlerRef.current = handler
+  }, [handler])
+
   useEffect(() => {
     if (options?.skip) return
-    const socket = getSocket()
-    if (!socket) return
-    const channel = `realtime:${eventType}`
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const wrapped = (event: any) => handler(event as RealtimeEvent<T>)
-    socket.on(channel, wrapped)
-    return () => {
-      socket.off(channel, wrapped)
+    // Si el socket aún no está listo (getSocket devolvió null porque el
+    // usuario se está autenticando), reintentamos cuando conecte.
+    // Esto evita la race condition de montar este hook ANTES que
+    // el RealtimeProvider haya llamado a getSocket().
+    let unsub: (() => void) | null = null
+    let cancelled = false
+
+    const trySubscribe = () => {
+      if (cancelled) return
+      const socket = getSocket()
+      if (!socket) {
+        // Reintentar en el próximo tick (cuando el provider ya creó el socket)
+        setTimeout(trySubscribe, 50)
+        return
+      }
+      const channel = `realtime:${eventType}`
+      const wrapped = (event: unknown) => handlerRef.current(event as RealtimeEvent<T>)
+      socket.on(channel, wrapped)
+      unsub = () => socket.off(channel, wrapped)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    trySubscribe()
+
+    return () => {
+      cancelled = true
+      if (unsub) unsub()
+    }
   }, [eventType, options?.skip])
 }

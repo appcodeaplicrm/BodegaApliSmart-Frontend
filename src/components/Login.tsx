@@ -2,7 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react'
 import { authStore } from '../store/auth'
 import { ApiError } from '../lib/api'
-import { rutaInicialSegunPermisos } from '../lib/routing'
+import { rutaInicialDesdePermisos } from '../lib/routing'
+import { bodegaActivaStore } from '../store/bodegaActiva'
+import { permisosPorBodegaStore } from '../store/permisosPorBodega'
+import { bodegasAccesiblesStore } from '../store/contextoBodega'
+import { bodegasStore } from '../store/bodegas'
 
 type LoginProps = {
   onBack: () => void
@@ -25,14 +29,62 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
     }
     setLoading(true)
     try {
+      // 1) Login
       await authStore.login(email, password)
-      // Decidir destino según sus permisos (smart redirect)
+      // 2) Resetear caches que dependen del user (pueden tener datos
+      //    del user anterior, sobre todo bodegaActivaStore que se
+      //    hidrata de localStorage).
+      bodegaActivaStore.reset()
+      permisosPorBodegaStore.reset()
+      bodegasAccesiblesStore.reset()
+      bodegasStore.reset()
+
+      // 3) Inicializar el contexto de bodega. Este paso es CRÍTICO
+      //    y tiene que pasar ANTES de navegar. Si navegamos antes,
+      //    `rutaInicialDesdePermisos` usa los permisos del login
+      //    (que son del rol global) y puede mandar al user a una
+      //    ruta que NO tiene permiso en su bodega activa.
+      const { bodegas, esPropietario } = await bodegasAccesiblesStore.cargar()
+
       const sesion = authStore.getSesion()
-      if (sesion) {
-        onLoginSuccess(rutaInicialSegunPermisos(sesion))
-      } else {
-        onLoginSuccess('/dashboard')
+      const esSuperadmin = sesion?.usuario.rol === 'superadmin'
+      if (esSuperadmin) {
+        onLoginSuccess('/superadmin/empresas')
+        return
       }
+      if (bodegas.length === 0) {
+        onLoginSuccess(esPropietario ? '/onboarding' : '/waiting')
+        return
+      }
+
+      // 4) Elegir la bodega activa: primero la guardada, después la
+      //    principal, después la primera.
+      const guardada = bodegaActivaStore.getId()
+      const activa =
+        bodegasAccesiblesStore.elegirBodegaActiva(guardada) ?? bodegas[0]
+      bodegaActivaStore.set(activa.id, activa.nombre)
+
+      // 5) Cargar permisos efectivos de esa bodega.
+      const permisos = await permisosPorBodegaStore.cargar(activa.id, {
+        force: true,
+      })
+
+      // 6) Sincronizar la sesión global con los permisos de la
+      //    bodega activa. Esto hace que `auth.sesion.permisos`
+      //    refleje lo que el user puede hacer en la bodega activa.
+      authStore.actualizarPermisos(
+        permisos.permisos,
+        permisos.modulePermissions,
+      )
+
+      // 7) Decidir la ruta inicial según los permisos EFECTIVOS
+      //    de la bodega activa, no del rol global.
+      const destino = rutaInicialDesdePermisos(permisos.permisos, {
+        esSuperadmin: false,
+        esPropietario: permisos.esPropietario || esPropietario,
+        tieneBodegas: true,
+      })
+      onLoginSuccess(destino)
     } catch (err) {
       if (err instanceof ApiError) {
         // Mensaje amigable según el código
@@ -52,7 +104,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="min-h-dvh bg-background text-foreground flex flex-col lg:flex-row">
       <aside className="hidden lg:flex lg:w-1/2 relative border-r border-border p-12 flex-col justify-between overflow-hidden">
         <div
           className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -68,7 +120,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
         <div className="relative z-10">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mb-8"
+            className="flex items-center gap-2 min-h-[44px] text-xs text-muted-foreground hover:text-foreground transition-colors mb-8"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             <ArrowLeft size={14} />
@@ -87,7 +139,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
 
         <div className="relative z-10">
           <h1
-            className="text-6xl xl:text-7xl uppercase leading-none text-foreground"
+            className="text-5xl xl:text-7xl uppercase leading-none text-foreground"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
           >
             tu bodega
@@ -113,7 +165,10 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <main
+        className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12"
+        style={{ paddingBottom: 'max(3rem, env(safe-area-inset-bottom))' }}
+      >
         <div className="flex lg:hidden items-center mb-10">
           <span
             className="text-foreground text-2xl tracking-wider"
@@ -126,7 +181,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
         <div className="max-w-sm w-full">
           <button
             onClick={onBack}
-            className="lg:hidden flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mb-6"
+            className="lg:hidden self-start flex items-center gap-2 min-h-[44px] text-xs text-muted-foreground hover:text-foreground transition-colors mb-6"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             <ArrowLeft size={14} />
@@ -166,10 +221,12 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
               <input
                 id="email"
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@empresa.com"
-                className="w-full px-4 py-3 border border-border bg-muted text-foreground text-sm placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
+                className="w-full px-4 py-3 min-h-[44px] border border-border bg-muted text-foreground text-sm placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
                 style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
               />
             </div>
@@ -188,14 +245,15 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 pr-11 border border-border bg-muted text-foreground text-sm placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
+                  className="w-full px-4 py-3 pr-11 min-h-[44px] border border-border bg-muted text-foreground text-sm placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
                   style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -225,7 +283,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full min-h-[44px] flex items-center justify-center gap-2 py-3 bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ borderRadius: '0.25rem' }}
             >
               {loading ? (
@@ -257,7 +315,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
 
             <button
               type="button"
-              className="w-full flex items-center justify-center gap-2 py-3 border border-border text-foreground text-sm hover:border-foreground/30 transition-all"
+              className="w-full min-h-[44px] flex items-center justify-center gap-2 py-3 border border-border text-foreground text-sm hover:border-foreground/30 transition-all"
               style={{ borderRadius: '0.25rem' }}
             >
               <GoogleIcon />

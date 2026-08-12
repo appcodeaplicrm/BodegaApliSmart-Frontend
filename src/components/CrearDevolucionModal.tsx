@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X, Loader2, Undo2 } from 'lucide-react'
+import { Loader2, Undo2 } from 'lucide-react'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
 import { usePedidos, pedidosStore, type Pedido } from '../store/pedidos'
 import { devolucionesStore, type Devolucion } from '../store/devoluciones'
 import { ApiError } from '../lib/api'
+import { Modal } from './Modal'
 
 type Props = {
   onClose: () => void
@@ -197,210 +198,20 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-2xl max-h-[90vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div>
-            <div
-              className="text-[10px] text-muted-foreground tracking-widest uppercase"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Nueva devolución
-            </div>
-            <h2
-              className="text-lg uppercase text-foreground mt-1"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
-            >
-              Devolver productos al inventario
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Cerrar"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Selector de pedido — o display si vino preseleccionado */}
-          <div>
-            <label
-              className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1.5 block"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Pedido original
-            </label>
-            {pedidoInicialId ? (
-              // Vino preseleccionado desde un botón externo: solo display,
-              // no le mostramos el select para que no pueda cambiarlo.
-              <div
-                className="w-full px-3 py-2 bg-muted/50 border border-border text-sm text-foreground"
-                style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-              >
-                {pedidosEntregados.find((p) => p.id === pedidoInicialId)?.codigo ??
-                  pedidoCompleto?.codigo ??
-                  'Cargando…'}{' '}
-                {pedidosEntregados.find((p) => p.id === pedidoInicialId)?.createdAtLabel ??
-                  (pedidoCompleto
-                    ? new Date(pedidoCompleto.createdAt).toLocaleString('es-CO', {
-                        dateStyle: 'short',
-                        timeStyle: 'short',
-                      })
-                    : '')}
-              </div>
-            ) : pedidosState.status === 'cargando' || pedidosState.status === 'idle' ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 size={14} className="animate-spin" /> Cargando pedidos…
-              </div>
-            ) : pedidosEntregados.length === 0 ? (
-              <p
-                className="text-xs text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                No tenés pedidos en estado <strong>Entregado</strong> para devolver.
-              </p>
-            ) : (
-              <select
-                value={pedidoId ?? ''}
-                onChange={(e) => setPedidoId(e.target.value || null)}
-                className="w-full px-3 py-2 bg-muted border border-border text-sm text-foreground outline-none focus:border-primary/60"
-                style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-              >
-                <option value="">Elegí un pedido…</option>
-                {pedidosEntregados.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.codigo} · {p.createdAtLabel}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Items a devolver */}
-          {cargandoPedido ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 size={14} className="animate-spin" /> Cargando detalle…
-            </div>
-          ) : items.length > 0 ? (
-            <div>
-              <label
-                className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1.5 block"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-              >
-                Productos a devolver
-              </label>
-              <ul
-                className="divide-y divide-border border border-border"
-                style={{ borderRadius: '0.25rem' }}
-              >
-                {items.map((it, idx) => (
-                  <li
-                    key={`${it.detalleId}-${it.productoId}`}
-                    className="p-3 bg-card flex items-center gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {it.kitNombre && (
-                          <span
-                            className="text-[10px] text-muted-foreground"
-                            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                          >
-                            [kit]
-                          </span>
-                        )}
-                        <span
-                          className="text-sm text-foreground"
-                          style={{ fontFamily: "'DM Sans', sans-serif" }}
-                        >
-                          {it.productoNombre}
-                        </span>
-                        <span
-                          className="text-[10px] text-muted-foreground"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                        >
-                          SKU {it.productoCodigo}
-                        </span>
-                      </div>
-                      <div
-                        className="text-[10px] text-muted-foreground mt-1"
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                      >
-                        Pedido original: {it.cantidadOriginal} {it.unidadAbreviatura}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <input
-                        type="number"
-                        min={0}
-                        max={it.cantidadOriginal}
-                        step={it.permiteDecimales ? '0.001' : '1'}
-                        value={it.cantidad}
-                        onChange={(e) => setCantidad(idx, Number(e.target.value))}
-                        className="w-20 px-2 py-1.5 bg-muted border border-border text-sm text-right outline-none focus:border-primary/60"
-                        style={{
-                          borderRadius: '0.25rem',
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}
-                      />
-                      <span
-                        className="text-xs text-muted-foreground min-w-[3rem]"
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                      >
-                        {it.unidadAbreviatura}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {/* Motivo */}
-          <div>
-            <label
-              className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1.5 block"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Motivo (opcional)
-            </label>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              rows={3}
-              placeholder="Ej: terminé el trabajo, la herramienta está en buen estado…"
-              className="w-full px-3 py-2.5 bg-muted border border-border text-sm outline-none focus:border-primary/60 resize-none"
-              style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-            />
-          </div>
-
-          {error && (
-            <p
-              className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
-              style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                borderRadius: '0.25rem',
-              }}
-            >
-              ⚠ {error}
-            </p>
-          )}
-        </form>
-
-        <div className="p-4 border-t border-border flex items-center gap-2 shrink-0">
+    <Modal
+      open
+      onClose={onClose}
+      title="Devolver productos al inventario"
+      description="Nueva devolución"
+      icon={<Undo2 size={16} className="text-primary" />}
+      size="lg"
+      footer={
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="px-3 py-2.5 border border-border text-sm disabled:opacity-50"
+            className="px-3 min-h-[44px] py-2.5 border border-border text-sm disabled:opacity-50"
             style={{ borderRadius: '0.25rem' }}
           >
             Cancelar
@@ -410,7 +221,7 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
             type="button"
             onClick={handleSubmit}
             disabled={!puedeEnviar}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '0.25rem' }}
           >
             {submitting ? (
@@ -425,7 +236,172 @@ export function CrearDevolucionModal({ onClose, onCreated, pedidoInicialId }: Pr
             )}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        {/* Selector de pedido — o display si vino preseleccionado */}
+        <div>
+          <label
+            className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1.5 block"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Pedido original
+          </label>
+          {pedidoInicialId ? (
+            // Vino preseleccionado desde un botón externo: solo display,
+            // no le mostramos el select para que no pueda cambiarlo.
+            <div
+              className="w-full px-3 py-2 min-h-[44px] bg-muted/50 border border-border text-sm text-foreground inline-flex items-center"
+              style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              {pedidosEntregados.find((p) => p.id === pedidoInicialId)?.codigo ??
+                pedidoCompleto?.codigo ??
+                'Cargando…'}{' '}
+              {pedidosEntregados.find((p) => p.id === pedidoInicialId)?.createdAtLabel ??
+                (pedidoCompleto
+                  ? new Date(pedidoCompleto.createdAt).toLocaleString('es-CO', {
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    })
+                  : '')}
+            </div>
+          ) : pedidosState.status === 'cargando' || pedidosState.status === 'idle' ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 size={14} className="animate-spin" /> Cargando pedidos…
+            </div>
+          ) : pedidosEntregados.length === 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              No tenés pedidos en estado <strong>Entregado</strong> para devolver.
+            </p>
+          ) : (
+            <select
+              value={pedidoId ?? ''}
+              onChange={(e) => setPedidoId(e.target.value || null)}
+              className="w-full px-3 py-2 min-h-[44px] bg-muted border border-border text-sm text-foreground outline-none focus:border-primary/60"
+              style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              <option value="">Elegí un pedido…</option>
+              {pedidosEntregados.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.codigo} · {p.createdAtLabel}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Items a devolver */}
+        {cargandoPedido ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 size={14} className="animate-spin" /> Cargando detalle…
+          </div>
+        ) : items.length > 0 ? (
+          <div>
+            <label
+              className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1.5 block"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              Productos a devolver
+            </label>
+            <ul
+              className="divide-y divide-border border border-border"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              {items.map((it, idx) => (
+                <li
+                  key={`${it.detalleId}-${it.productoId}`}
+                  className="p-3 bg-card flex items-center gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {it.kitNombre && (
+                        <span
+                          className="text-[10px] text-muted-foreground"
+                          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                        >
+                          [kit]
+                        </span>
+                      )}
+                      <span
+                        className="text-sm text-foreground"
+                        style={{ fontFamily: "'DM Sans', sans-serif" }}
+                      >
+                        {it.productoNombre}
+                      </span>
+                      <span
+                        className="text-[10px] text-muted-foreground"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        SKU {it.productoCodigo}
+                      </span>
+                    </div>
+                    <div
+                      className="text-[10px] text-muted-foreground mt-1"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      Pedido original: {it.cantidadOriginal} {it.unidadAbreviatura}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <input
+                      type="number"
+                      min={0}
+                      max={it.cantidadOriginal}
+                      step={it.permiteDecimales ? '0.001' : '1'}
+                      value={it.cantidad}
+                      onChange={(e) => setCantidad(idx, Number(e.target.value))}
+                      className="w-20 min-h-[44px] px-2 py-1.5 bg-muted border border-border text-sm text-right outline-none focus:border-primary/60"
+                      style={{
+                        borderRadius: '0.25rem',
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    />
+                    <span
+                      className="text-xs text-muted-foreground min-w-[3rem]"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {it.unidadAbreviatura}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {/* Motivo */}
+        <div>
+          <label
+            className="text-[10px] text-muted-foreground tracking-widest uppercase mb-1.5 block"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Motivo (opcional)
+          </label>
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            rows={3}
+            placeholder="Ej: terminé el trabajo, la herramienta está en buen estado…"
+            className="w-full px-3 py-2.5 min-h-[44px] bg-muted border border-border text-sm outline-none focus:border-primary/60 resize-none"
+            style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+          />
+        </div>
+
+        {error && (
+          <p
+            className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              borderRadius: '0.25rem',
+            }}
+          >
+            ⚠ {error}
+          </p>
+        )}
+      </form>
+    </Modal>
   )
 }

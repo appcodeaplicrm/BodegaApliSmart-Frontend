@@ -8,17 +8,17 @@
  * - Tabla Programados: barra de progreso coloreada por estado.
  * - Tabla Historial: búsqueda por técnico/plantilla/ID, columna ÍTEMS
  *   con fracción + mini barra, columna RESULTADO con 3 variantes, botón
- *   PDF por fila (descarga vía jsPDF en `pdf.ts`).
+ *   PDF por fila (descarga vía window.print() en `ChecklistPdf.tsx`).
  * - Footer del historial: contador + resumen por color.
  */
 import { useState, useMemo, useEffect } from 'react'
 import { Plus, Download, Search, Play, Lock, Calendar, CalendarDays, X, Eye } from 'lucide-react'
 import type { CkAsignado, CkHistorialItem } from './types'
-import { descargarPdfDetalle } from './pdf.tsx'
-import { obtenerAsignacion } from './api'
 import { EjecutarChecklistModal } from './EjecutarChecklistModal'
 import { CalendarioProgramadosModal } from './CalendarioProgramadosModal'
+import { PdfRangeModal } from './PdfRangeModal'
 import { historial as apiHistorial } from './api'
+import { Modal } from '../Modal'
 
 type Props = {
   asignaciones: CkAsignado[]
@@ -110,7 +110,7 @@ export function ProgramadosHistorial({
     : null
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Programados */}
       <section>
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -139,7 +139,7 @@ export function ProgramadosHistorial({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2">
             {filtroDia !== todayYmd && (
               <button
                 onClick={handleGoToToday}
@@ -161,18 +161,39 @@ export function ProgramadosHistorial({
             {canCreate && (
               <button
                 onClick={onNuevoChecklist}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-primary/15 text-primary border border-primary/20 hover:bg-primary/25"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
                 style={{ borderRadius: '0.25rem' }}
               >
-                <Plus size={11} /> Nuevo checklist
+                <Plus size={12} /> Nuevo checklist
               </button>
             )}
           </div>
+        </div>
+        {/* Mobile: fila de acciones full-width (Calendario + Nuevo checklist) */}
+        <div className="sm:hidden mb-3 flex items-center gap-2">
+          <button
+            onClick={() => setShowCalendario(true)}
+            className="flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs border border-border hover:border-primary/40"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <CalendarDays size={12} /> Calendario
+          </button>
+          {canCreate && (
+            <button
+              onClick={onNuevoChecklist}
+              className="flex-1 min-h-[40px] inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              <Plus size={12} /> Nuevo
+            </button>
+          )}
         </div>
         <ProgramadosTable
           rows={programadosFiltrados}
           onOpen={(id) => setAsignacionAbiertaId(id)}
           canExecute={filtroDia === todayYmd}
+          filtroDia={filtroDia}
+          todayYmd={todayYmd}
         />
       </section>
 
@@ -217,6 +238,8 @@ function ProgramadosTable({
   rows,
   onOpen,
   canExecute,
+  filtroDia,
+  todayYmd,
 }: {
   rows: CkAsignado[]
   onOpen: (id: string) => void
@@ -227,110 +250,407 @@ function ProgramadosTable({
    * "Ver" y el wizard se abre en modo read-only.
    */
   canExecute: boolean
+  /** Día actualmente filtrado, para el label del modal de detalle. */
+  filtroDia: string | null
+  /** YMD de hoy (para mostrar hint "no es hoy"). */
+  todayYmd: string
 }) {
+  const [detalle, setDetalle] = useState<CkAsignado | null>(null)
+
   if (rows.length === 0) {
     return <Empty msg="No hay checklists programados." />
   }
+
+  const isOtherDay = filtroDia !== null && filtroDia !== todayYmd
+
   return (
-    <div className="bg-card border border-border overflow-hidden" style={{ borderRadius: '0.25rem' }}>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="text-[10px] text-muted-foreground tracking-widest border-b border-border"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            <th className="text-left px-3 py-2">ID</th>
-            <th className="text-left px-3 py-2">PLANTILLA</th>
-            <th className="text-left px-3 py-2">TÉCNICO</th>
-            <th className="text-left px-3 py-2">ROL</th>
-            <th className="text-left px-3 py-2">FECHA LÍMITE</th>
-            <th className="text-left px-3 py-2">PROGRESO</th>
-            <th className="text-left px-3 py-2">ESTADO</th>
-            <th className="text-right px-3 py-2">ACCIÓN</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const cerrado = r.estado === 'completado'
-            // El botón es "Ejecutar" solo si la fila NO está cerrada
-            // Y el filtro es hoy. Si no, es "Ver" (read-only).
-            const ejecutable = !cerrado && canExecute
-            return (
-              <tr
-                key={r.id}
-                className="border-b border-border/40 last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                onClick={() => onOpen(r.id)}
-                title={
-                  cerrado
-                    ? 'Ver resultado'
-                    : ejecutable
-                      ? 'Ejecutar checklist'
-                      : 'Solo lectura (no es el día de hoy)'
-                }
-              >
-                <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">
+    <>
+      {/* Mobile: lista compacta — solo Plantilla, Técnico, Estado.
+          Tap en la fila abre el modal de detalle. */}
+      <div className="sm:hidden bg-card border border-border divide-y divide-border/40"
+        style={{ borderRadius: '0.25rem' }}>
+        {rows.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => setDetalle(r)}
+            className="w-full text-left px-4 py-3 hover:bg-muted/30 active:bg-muted/50 transition-colors min-h-[64px] flex items-center gap-3"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className="text-sm font-semibold text-foreground truncate"
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                >
+                  {r.plantilla}
+                </span>
+                <span
+                  className="text-[10px] text-muted-foreground"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
                   {r.id.slice(0, 8).toUpperCase()}
-                </td>
-                <td className="px-3 py-2 text-foreground">{r.plantilla}</td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {initials(r.tecnico)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] text-muted-foreground"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                  {initials(r.tecnico)}
+                </div>
+                <span className="truncate">{r.tecnico}</span>
+              </div>
+            </div>
+            <EstadoBadge estado={r.estado} />
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop: tabla completa */}
+      <div className="hidden sm:block bg-card border border-border overflow-hidden" style={{ borderRadius: '0.25rem' }}>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-[10px] text-muted-foreground tracking-widest border-b border-border"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              <th className="text-left px-3 py-2">ID</th>
+              <th className="text-left px-3 py-2">PLANTILLA</th>
+              <th className="text-left px-3 py-2">TÉCNICO</th>
+              <th className="text-left px-3 py-2">ROL</th>
+              <th className="text-left px-3 py-2">FECHA LÍMITE</th>
+              <th className="text-left px-3 py-2">PROGRESO</th>
+              <th className="text-left px-3 py-2">ESTADO</th>
+              <th className="text-right px-3 py-2">ACCIÓN</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const cerrado = r.estado === 'completado'
+              const ejecutable = !cerrado && canExecute
+              return (
+                <tr
+                  key={r.id}
+                  className="border-b border-border/40 last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                  onClick={() => setDetalle(r)}
+                  title={
+                    cerrado
+                      ? 'Ver resultado'
+                      : ejecutable
+                        ? 'Ejecutar checklist'
+                        : 'Solo lectura (no es el día de hoy)'
+                  }
+                >
+                  <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">
+                    {r.id.slice(0, 8).toUpperCase()}
+                  </td>
+                  <td className="px-3 py-2 text-foreground">{r.plantilla}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        {initials(r.tecnico)}
+                      </div>
+                      <span className="text-foreground">{r.tecnico}</span>
                     </div>
-                    <span className="text-foreground">{r.tecnico}</span>
-                  </div>
-                </td>
-                <td className="px-3 py-2 text-muted-foreground">{r.rol}</td>
-                <td className="px-3 py-2 text-foreground">{r.fecha}</td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${r.progreso}%`,
-                          background: progressColor(r.estado, r.progreso),
-                        }}
-                      />
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.rol}</td>
+                  <td className="px-3 py-2 text-foreground">{r.fecha}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${r.progreso}%`,
+                            background: progressColor(r.estado, r.progreso),
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        {r.progreso}%
+                      </span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {r.progreso}%
-                    </span>
-                  </div>
-                </td>
-                <td className="px-3 py-2">
-                  <EstadoBadge estado={r.estado} />
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {cerrado ? (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground border border-border"
-                      style={{ borderRadius: '0.25rem' }}
-                    >
-                      <Lock size={11} /> Ver
-                    </span>
-                  ) : ejecutable ? (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] bg-primary/15 text-primary border border-primary/20"
-                      style={{ borderRadius: '0.25rem' }}
-                    >
-                      <Play size={11} /> Ejecutar
-                    </span>
-                  ) : (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground border border-border"
-                      style={{ borderRadius: '0.25rem' }}
-                    >
-                      <Eye size={11} /> Ver
-                    </span>
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                  </td>
+                  <td className="px-3 py-2">
+                    <EstadoBadge estado={r.estado} />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {cerrado ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground border border-border"
+                        style={{ borderRadius: '0.25rem' }}
+                      >
+                        <Lock size={11} /> Ver
+                      </span>
+                    ) : ejecutable ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[10px] bg-primary/15 text-primary border border-primary/20"
+                        style={{ borderRadius: '0.25rem' }}
+                      >
+                        <Play size={11} /> Ejecutar
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground border border-border"
+                        style={{ borderRadius: '0.25rem' }}
+                      >
+                        <Eye size={11} /> Ver
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal de detalle: muestra toda la info + acción contextual.
+          En mobile, lo abrimos al tocar la fila.
+          En desktop, también se abre al click (mejor UX que el tooltip). */}
+      {detalle && (
+        <ProgramadoDetalleModal
+          row={detalle}
+          isOtherDay={isOtherDay}
+          onClose={() => setDetalle(null)}
+          onEjecutarVer={() => {
+            const id = detalle.id
+            setDetalle(null)
+            onOpen(id)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+// ─────── Detalle del programado (modal mobile + click-info desktop) ───────
+
+function ProgramadoDetalleModal({
+  row,
+  isOtherDay,
+  onClose,
+  onEjecutarVer,
+}: {
+  row: CkAsignado
+  /** Si es true, la fila es de otro día → no se puede ejecutar, solo ver. */
+  isOtherDay: boolean
+  onClose: () => void
+  onEjecutarVer: () => void
+}) {
+  const cerrado = row.estado === 'completado'
+  const ejecutable = !cerrado && !isOtherDay
+  const accionLabel = cerrado
+    ? 'Ver resultado'
+    : ejecutable
+      ? 'Ejecutar checklist'
+      : 'Ver detalle'
+  const accionIcon = cerrado || !ejecutable ? Eye : Play
+  const AccionIcon = accionIcon
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={row.plantilla}
+      icon={
+        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[11px] text-muted-foreground"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {initials(row.tecnico)}
+        </div>
+      }
+      size="md"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[44px] px-4 text-sm border border-border text-foreground hover:border-foreground/30 transition-colors"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            Cerrar
+          </button>
+          <button
+            type="button"
+            onClick={onEjecutarVer}
+            className="min-h-[44px] inline-flex items-center gap-2 px-4 text-sm bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <AccionIcon size={14} />
+            {accionLabel}
+          </button>
+        </div>
+      }
+    >
+      <div className="p-5 space-y-3">
+        {/* Plantilla + ID */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span
+                className="text-[10px] text-muted-foreground tracking-widest"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {row.id.slice(0, 8).toUpperCase()}
+              </span>
+            </div>
+            <h3
+              className="text-base uppercase text-foreground"
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
+            >
+              {row.plantilla}
+            </h3>
+          </div>
+          <EstadoBadge estado={row.estado} />
+        </div>
+
+        {/* Datos en filas 2-col */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <DetalleRow label="Técnico" value={row.tecnico} />
+          <DetalleRow label="Rol" value={row.rol} />
+          <DetalleRow label="Fecha límite" value={row.fecha} />
+          <DetalleRow label="Progreso" value={`${row.progreso}%`} />
+        </div>
+
+        {/* Barra de progreso */}
+        <div>
+          <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${row.progreso}%`,
+                background: progressColor(row.estado, row.progreso),
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Hint si es de otro día */}
+        {isOtherDay && !cerrado && (
+          <div className="text-[11px] text-muted-foreground bg-muted/50 border border-border px-3 py-2 flex items-center gap-2"
+            style={{ borderRadius: '0.25rem' }}>
+            <Eye size={12} className="shrink-0" />
+            Este checklist es de otro día. Solo se puede ejecutar el día de hoy.
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+function DetalleRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div
+        className="text-[10px] text-muted-foreground tracking-widest mb-0.5"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        {label.toUpperCase()}
+      </div>
+      <div className="text-sm text-foreground">{value}</div>
     </div>
+  )
+}
+
+// ─────── Detalle del historial (modal mobile + click-info desktop) ───────
+
+function HistorialDetalleModal({
+  row,
+  onClose,
+  onDownload,
+}: {
+  row: CkHistorialItem
+  onClose: () => void
+  onDownload: () => void
+}) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={row.plantilla}
+      icon={
+        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[11px] text-muted-foreground"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {initials(row.tecnico)}
+        </div>
+      }
+      size="md"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[44px] px-4 text-sm border border-border text-foreground hover:border-foreground/30 transition-colors"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            Cerrar
+          </button>
+          <button
+            type="button"
+            onClick={onDownload}
+            className="min-h-[44px] inline-flex items-center gap-2 px-4 text-sm bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <Download size={14} />
+            Descargar PDF
+          </button>
+        </div>
+      }
+    >
+      <div className="p-5 space-y-3">
+        {/* Plantilla + ID + resultado */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span
+                className="text-[10px] text-muted-foreground tracking-widest"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {row.id.slice(0, 8).toUpperCase()}
+              </span>
+            </div>
+            <h3
+              className="text-base uppercase text-foreground"
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
+            >
+              {row.plantilla}
+            </h3>
+          </div>
+          <ResultadoBadge resultado={row.resultado} />
+        </div>
+
+        {/* Datos en filas 2-col */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <DetalleRow label="Técnico" value={row.tecnico} />
+          <DetalleRow label="Rol" value={row.rol} />
+          <DetalleRow label="Fecha" value={row.fecha} />
+          <DetalleRow label="Duración" value={row.duracion} />
+        </div>
+
+        {/* Ítems con mini barra */}
+        <div>
+          <div
+            className="text-[10px] text-muted-foreground tracking-widest mb-1"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            ÍTEMS ({row.ok}/{row.total})
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${row.total > 0 ? (row.ok / row.total) * 100 : 0}%`,
+                  background: '#ABF768',
+                }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground tabular-nums"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              {row.total > 0 ? Math.round((row.ok / row.total) * 100) : 0}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -338,6 +658,23 @@ function ProgramadosTable({
 
 function HistorialTable({ rows, bodegaId }: { rows: CkHistorialItem[]; bodegaId: string }) {
   const [search, setSearch] = useState('')
+  const [detalle, setDetalle] = useState<CkHistorialItem | null>(null)
+  /**
+   * ID de la asignación para la cual se está abriendo el modal de
+   * rango de fechas del PDF. Cuando es null, el modal está cerrado.
+   */
+  const [pdfRange, setPdfRange] = useState<
+    | { asignacionId: string }
+    | null
+  >(null)
+
+  // Descarga del PDF con manejo de errores. Lo extraemos para
+  // reutilizarlo desde la fila desktop y desde el modal de detalle.
+  // AHORA solo dispara el modal de rango; la descarga real la hace
+  // el PdfRangeModal tras elegir las fechas.
+  const handleOpenPdfRange = (asignacionId: string) => {
+    setPdfRange({ asignacionId })
+  }
   /**
    * Filtro por fecha:
    *  - `fechaFiltro` = el día que el user eligió (YYYY-MM-DD)
@@ -470,7 +807,55 @@ function HistorialTable({ rows, bodegaId }: { rows: CkHistorialItem[]; bodegaId:
         )}
       </div>
 
-      <div className="bg-card border border-border overflow-hidden" style={{ borderRadius: '0.25rem' }}>
+      {/* Mobile: lista compacta — solo Plantilla, Técnico, Fecha, Resultado.
+          Tap en la fila abre el modal de detalle con toda la info + botón PDF. */}
+      <div className="sm:hidden bg-card border border-border divide-y divide-border/40"
+        style={{ borderRadius: '0.25rem' }}>
+        {filtered.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => setDetalle(r)}
+            className="w-full text-left px-4 py-3 hover:bg-muted/30 active:bg-muted/50 transition-colors min-h-[68px] flex items-center gap-3"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className="text-sm font-semibold text-foreground truncate"
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                >
+                  {r.plantilla}
+                </span>
+                <span
+                  className="text-[10px] text-muted-foreground"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  {r.id.slice(0, 8).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] text-muted-foreground shrink-0"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    {initials(r.tecnico)}
+                  </div>
+                  <span className="truncate">{r.tecnico}</span>
+                </div>
+                <span
+                  className="text-[10px] text-muted-foreground shrink-0"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  {r.fecha}
+                </span>
+              </div>
+            </div>
+            <ResultadoBadge resultado={r.resultado} />
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop: tabla completa */}
+      <div className="hidden sm:block bg-card border border-border overflow-hidden" style={{ borderRadius: '0.25rem' }}>
         <table className="w-full text-xs">
           <thead>
             <tr className="text-[10px] text-muted-foreground tracking-widest border-b border-border"
@@ -488,7 +873,12 @@ function HistorialTable({ rows, bodegaId }: { rows: CkHistorialItem[]; bodegaId:
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-border/40 last:border-b-0">
+              <tr
+                key={r.id}
+                className="border-b border-border/40 last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                onClick={() => setDetalle(r)}
+                title="Ver detalle del checklist"
+              >
                 <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">
                   {r.id.slice(0, 8).toUpperCase()}
                 </td>
@@ -518,21 +908,13 @@ function HistorialTable({ rows, bodegaId }: { rows: CkHistorialItem[]; bodegaId:
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button
-                    onClick={async () => {
-                      try {
-                        // Traemos el detalle completo (con fotos y
-                        // observaciones por ítem) para generar un PDF
-                        // rico. Si falla el fetch, caemos al resumen
-                        // pelado.
-                        const detalle = await obtenerAsignacion(r.id)
-                        await descargarPdfDetalle(detalle)
-                      } catch (e) {
-                        alert(`No se pudo generar el PDF: ${(e as Error).message}`)
-                      }
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOpenPdfRange(r.id)
                     }}
                     className="inline-flex items-center gap-1 px-2 py-1 text-[10px] border border-border hover:border-primary/40"
                     style={{ borderRadius: '0.25rem' }}
-                    title="Descargar PDF"
+                    title="Generar PDF"
                   >
                     <Download size={11} /> PDF
                   </button>
@@ -542,6 +924,25 @@ function HistorialTable({ rows, bodegaId }: { rows: CkHistorialItem[]; bodegaId:
           </tbody>
         </table>
       </div>
+
+      {/* Modal de detalle del historial */}
+      {detalle && (
+        <HistorialDetalleModal
+          row={detalle}
+          onClose={() => setDetalle(null)}
+          onDownload={() => handleOpenPdfRange(detalle.id)}
+        />
+      )}
+
+      {/* Modal de rango de fechas para el PDF */}
+      {pdfRange && (
+        <PdfRangeModal
+          open
+          asignacionId={pdfRange.asignacionId}
+          bodegaId={bodegaId}
+          onClose={() => setPdfRange(null)}
+        />
+      )}
 
       {/* Footer resumen */}
       <div className="flex items-center justify-between text-[10px] text-muted-foreground px-1"

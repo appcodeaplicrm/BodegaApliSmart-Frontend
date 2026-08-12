@@ -87,13 +87,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // Refetch silencioso de la lista de productos (la cantidad de stock
     // del producto afectado se actualiza en el back y se trae fresca).
     void productosStore.handleMovimientoCreado({ bodegaId: e.bodegaId })
-    // También actualizamos la lista de movimientos (insert arriba en pág 1)
-    const currentBodegaId = bodegaActivaStore.getSnapshot().bodegaId ?? undefined
-    movimientosStore.handleMovimientoCreado({
-      bodegaId: e.bodegaId,
-      payload: e.payload as any,
-      currentBodegaId,
-    })
+    // Refetch de la lista de movimientos. NO insertamos el payload
+    // directamente porque el socket emite una versión "delgada" (sin
+    // cantidadBase, stockAnterior, fecha, observacion, usuario, etc.)
+    // y el componente Movimientos.tsx lee todos esos campos → tira
+    // error de render si los encuentra como undefined.
+    // El refetch trae el movimiento completo desde /movimientos con la
+    // forma que el componente ya sabe consumir.
+    void movimientosStore.refetchActual()
   })
   useRealtimeEvent('producto.creado', (e) => {
     void productosStore.handleProductoCambiado({ bodegaId: e.bodegaId })

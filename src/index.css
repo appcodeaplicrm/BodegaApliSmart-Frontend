@@ -44,3 +44,22 @@ body {
 *::-webkit-scrollbar-thumb:hover {
   background-color: #444444;
 }
+
+/* ── react-toastify · posición responsive ─────────────────── */
+/* Top-right en ≥sm (640px), top-center en móvil.              */
+/* Sobreescribimos el style inline que la lib pone en cada      */
+/* toast vía selectores por data-attribute.                     */
+@media (max-width: 639px) {
+  .sp-toast-container {
+    top: 0.5rem !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    width: auto !important;
+    max-width: none !important;
+    transform: none !important;
+  }
+  .sp-toast-container > div {
+    width: 100% !important;
+    margin: 0 0 0.5rem 0 !important;
+  }
+}

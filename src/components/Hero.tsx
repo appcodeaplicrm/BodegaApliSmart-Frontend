@@ -13,12 +13,12 @@ const chartData = [
 
 export function Hero() {
   return (
-    <section className="pt-20 pb-24">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
+    <section className="pt-20 pb-16 sm:pb-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
           <div>
             <h1
-              className="text-6xl md:text-8xl uppercase leading-none text-foreground"
+              className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl uppercase leading-[0.95] text-foreground break-words"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
             >
               controla tu
@@ -29,22 +29,22 @@ export function Hero() {
             </h1>
 
             <p
-              className="mt-3 text-base text-muted-foreground max-w-md leading-relaxed"
+              className="mt-4 sm:mt-3 text-base text-muted-foreground max-w-md leading-relaxed"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
               stockpro centraliza entradas, salidas, picking e inventario en una sola plataforma
               diseñada para operaciones de logística y supply chain en latinoamérica.
             </p>
 
-            <div className="mt-4 flex flex-col sm:flex-row gap-3">
-              <button className="group inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground text-sm font-medium">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <button className="group min-h-[44px] inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground text-sm font-medium">
                 Empezar prueba gratis
                 <ArrowRight
                   size={16}
                   className="group-hover:translate-x-0.5 transition-transform"
                 />
               </button>
-              <button className="group inline-flex items-center justify-center gap-2 px-6 py-3 border border-border text-foreground text-sm font-medium hover:border-foreground/40 transition-colors">
+              <button className="group min-h-[44px] inline-flex items-center justify-center gap-2 px-6 py-3 border border-border text-foreground text-sm font-medium hover:border-foreground/40 transition-colors">
                 Ver demo en vivo
                 <ChevronRight
                   size={16}
@@ -53,7 +53,7 @@ export function Hero() {
               </button>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-border grid grid-cols-3 gap-6">
+            <div className="mt-6 pt-4 border-t border-border grid grid-cols-3 gap-3 sm:gap-6">
               <Metric value="98.7%" label="precisión" />
               <Metric value="2.4x" label="más rápido" />
               <Metric value="24/7" label="operación" />
@@ -112,7 +112,7 @@ function DashboardCard() {
         </div>
       </div>
 
-      <div className="h-48">
+      <div className="h-48 sm:h-56">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
             <defs>

@@ -46,7 +46,13 @@ export type ModuloDef = {
 
 export const MODULOS: readonly ModuloDef[] = [
   { key: 'dashboard', label: 'Dashboard', acciones: ['ver'] },
-  { key: 'inventario', label: 'Inventario', acciones: ['ver', 'crear', 'editar', 'eliminar'] },
+  { key: 'inventario', label: 'Inventario', acciones: ['ver', 'crear', 'editar', 'eliminar'], submodulos: [
+    { key: 'productos', label: 'Productos' },
+    { key: 'categorias', label: 'Categorías' },
+    { key: 'marcas', label: 'Marcas' },
+    { key: 'proveedores', label: 'Proveedores' },
+    { key: 'ubicaciones', label: 'Secciones de la bodega' },
+  ]},
   { key: 'movimientos', label: 'Movimientos', acciones: ['ver', 'crear', 'editar', 'eliminar'] },
   { key: 'despachos', label: 'Despachos', acciones: ['ver', 'crear', 'editar', 'eliminar'] },
   { key: 'usuarios', label: 'Usuarios', acciones: ['ver', 'crear', 'editar', 'eliminar'] },
@@ -341,10 +347,22 @@ export function usePermisos() {
 export async function apiGetPermisosUsuario(usuarioId: string): Promise<{
   override: ModulePermissionMap | null
   permisosEfectivos: ModulePermissionMap
+  /** Rol del user EN ESTA BODEGA (el de `UsuarioBodega`), no el
+   *  global. `null` si es propietario del tenant sin asignación. */
+  rol: { id: string; key: string; nombre: string } | null
+  /** Permisos del ROL del user en la bodega activa, como lista plana
+   *  de keys (`modulo.accion` o `modulo.submodulo.accion`). Vacío si
+   *  no tiene rol explícito (propietario sin asignación) o si el
+   *  endpoint no recibió el header `X-Bodega-Id`. */
+  rolPermisos: string[]
+  esPropietario: boolean
 }> {
   return api.get<{
     override: ModulePermissionMap | null
     permisosEfectivos: ModulePermissionMap
+    rol: { id: string; key: string; nombre: string } | null
+    rolPermisos: string[]
+    esPropietario: boolean
   }>(`/usuarios/${usuarioId}/permisos`)
 }
 

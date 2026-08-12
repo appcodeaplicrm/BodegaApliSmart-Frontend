@@ -48,6 +48,10 @@ export type ProductoListItem = {
   stockMinimo: number
   stockMaximo: number | null
   activo: boolean
+  // Sprint 3 — Política de devolución (sección 21 del .md).
+  // TRUE → el técnico debe devolver el producto después de su uso.
+  // FALSE → producto consumible o no retornable.
+  admiteDevolucion: boolean
   categoria: { id: string; nombre: string }
   marca: { id: string; nombre: string } | null
   unidadMedida: { id: string; nombre: string; abreviatura: string; permiteDecimales: boolean }

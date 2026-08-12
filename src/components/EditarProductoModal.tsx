@@ -12,6 +12,7 @@ import {
   Loader2,
   MapPin,
   Plus,
+  RotateCcw,
 } from 'lucide-react'
 import {
   productosStore,
@@ -23,6 +24,7 @@ import { useUnidadesMedida, unidadesMedidaStore } from '../store/unidades-medida
 import { useMarcas, marcasStore } from '../store/marcas'
 import { useUbicaciones } from '../store/ubicaciones'
 import { ModalCrearCatalogo } from './ModalCrearCatalogo'
+import { Modal } from './Modal'
 
 type Props = {
   producto: Producto
@@ -45,6 +47,12 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
   const [stockCantidad, setStockCantidad] = useState(stockInicial)
   const [unidadMedidaId, setUnidadMedidaId] = useState(producto.unidadMedida.id)
   const [activo, setActivo] = useState(producto.activo)
+  // Política de devolución (sección 21 del .md). Editar este flag
+  // afecta SOLO las próximas entregas (cada EntregaItem tiene su
+  // propia fotografía histórica).
+  const [admiteDevolucion, setAdmiteDevolucion] = useState(
+    producto.admiteDevolucion,
+  )
   const [ubicacionId, setUbicacionId] = useState<string | null>(null)
 
   const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string }>>([])
@@ -95,6 +103,8 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
         stockMinimo,
         stockMaximo: stockMaximo > 0 ? stockMaximo : undefined,
         activo,
+        // Política de devolución (sección 21).
+        admiteDevolucion,
         stockCantidad: stockCantidad !== stockInicial ? stockCantidad : undefined,
         stockUbicacionId: ubicacionId ?? undefined,
       }
@@ -109,49 +119,55 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
   }
 
   const inputClass =
-    'w-full px-3 py-2.5 bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors'
+    'w-full px-3 py-2.5 min-h-[44px] bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors'
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-2xl max-h-[92vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
+    <>
+      <Modal
+        open
+        onClose={onClose}
+        title="Editar Producto"
+        description="Cambiá los datos del producto"
+        icon={<Package size={16} className="text-primary" />}
+        size="lg"
+        footer={
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary/15 flex items-center justify-center">
-              <Package size={18} className="text-primary" />
-            </div>
-            <div>
-              <h2
-                className="text-xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                Editar Producto
-              </h2>
-              <p
-                className="mt-1 text-xs text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                Cambiá los datos del producto
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              <X size={14} />
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="editar-producto-form"
+              disabled={submitting}
+              className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Guardando…
+                </>
+              ) : (
+                <>
+                  <CircleCheck size={14} />
+                  Guardar
+                </>
+              )}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Cerrar"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
+        }
+      >
+        <form
+          id="editar-producto-form"
+          onSubmit={handleSubmit}
+          className="p-5 space-y-5"
+        >
           <Section title="Identificación" icon={Tag}>
             <div className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -200,7 +216,7 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
                     <button
                       type="button"
                       onClick={() => setCrearCategoria(true)}
-                      className="inline-flex items-center gap-1 px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
                       style={{
                         borderRadius: '0.25rem',
                         fontFamily: "'JetBrains Mono', monospace",
@@ -228,7 +244,7 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
                     <button
                       type="button"
                       onClick={() => setCrearMarca(true)}
-                      className="inline-flex items-center gap-1 px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors shrink-0 text-xs"
                       style={{
                         borderRadius: '0.25rem',
                         fontFamily: "'JetBrains Mono', monospace",
@@ -241,6 +257,51 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
                 </Field>
               </div>
             </div>
+          </Section>
+
+          {/* Política de devolución (sección 21 del .md) — vive
+              acá arriba porque su edición es simple y bloquea el
+              formulario si no se confirma (es un cambio de regla de
+              negocio). */}
+          <Section title="Política de devolución" icon={RotateCcw}>
+            <Field
+              label="¿Admite devolución?"
+              hint={
+                admiteDevolucion
+                  ? 'El técnico deberá devolver este producto después de su uso.'
+                  : 'Este producto se considera consumible o no retornable.'
+              }
+            >
+              <label className="flex items-center gap-3 cursor-pointer select-none min-h-[44px]">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={admiteDevolucion}
+                  onClick={() => setAdmiteDevolucion((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center transition-colors ${
+                    admiteDevolucion ? 'bg-secondary' : 'bg-muted'
+                  }`}
+                  style={{ borderRadius: '0.25rem' }}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform bg-foreground transition-transform ${
+                      admiteDevolucion ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                    style={{ borderRadius: '0.15rem' }}
+                  />
+                </button>
+                <div className="text-sm">
+                  <div
+                    className="text-foreground font-semibold"
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                  >
+                    {admiteDevolucion
+                      ? 'Admite devolución'
+                      : 'No admite devolución'}
+                  </div>
+                </div>
+              </label>
+            </Field>
           </Section>
 
           <Section title="Unidad y stock" icon={Ruler}>
@@ -280,7 +341,7 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
                 </Field>
               </div>
               {ubicaciones.length > 0 && (
-                <Field label="Ubicación" icon={MapPin}>
+                <Field label="Ubicación dentro de bodega" icon={MapPin}>
                   <select
                     value={ubicacionId ?? ''}
                     onChange={(e) => setUbicacionId(e.target.value || null)}
@@ -335,38 +396,7 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
             </p>
           )}
         </form>
-
-        <div className="p-4 border-t border-border flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            <X size={14} />
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e as unknown as FormEvent)}
-            disabled={submitting}
-            className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            {submitting ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                Guardando…
-              </>
-            ) : (
-              <>
-                <CircleCheck size={14} />
-                Guardar
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+      </Modal>
 
       {crearCategoria && (
         <ModalCrearCatalogo
@@ -403,7 +433,7 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
           onClose={() => setCrearMarca(false)}
         />
       )}
-    </div>
+    </>
   )
 }
 

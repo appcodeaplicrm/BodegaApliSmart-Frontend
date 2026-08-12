@@ -1,22 +1,28 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { rutaInicialSegunPermisos } from './lib/routing'
+import { rutaInicialSegunPermisos, primeraRutaPermitida } from './lib/routing'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Navbar } from './components/Navbar'
 import { Landing } from './components/Landing'
 import { Login } from './components/Login'
 import { Dashboard } from './components/Dashboard'
 import { OnboardingAdmin } from './components/OnboardingAdmin'
 import { WaitingForBodega } from './components/WaitingForBodega'
+import { Perfil } from './components/Perfil'
+import { SinPermisosBodega } from './components/SinPermisosBodega'
 import { SuperAdminEmpresas, SuperAdminPlanes, SuperAdminPlaceholder } from './components/SuperAdmin'
 import { AppLayout } from './components/AppLayout'
 import { RequireAuth } from './components/RequireAuth'
 import { RealtimeProvider } from './components/RealtimeProvider'
+import { ToastBridge } from './components/ToastBridge'
 import { authStore, useAuth } from './store/auth'
 import { bodegasStore } from './store/bodegas'
 import { dashboardStore } from './store/dashboard'
 import { bodegaActivaStore } from './store/bodegaActiva'
 import { alertasStore } from './store/alertas'
 import { tenantActivoStore } from './store/tenantActivo'
+import { bodegasAccesiblesStore } from './store/contextoBodega'
+import { permisosPorBodegaStore } from './store/permisosPorBodega'
 
 /**
  * Rutas:
@@ -35,17 +41,111 @@ import { tenantActivoStore } from './store/tenantActivo'
  *   3. Login → si el usuario no es admin y NO tiene bodega → /waiting
  *   4. Después de crear la primera bodega en /onboarding → /dashboard
  */
+/**
+ * Estado del bootstrap multibodega (corrección 2 del .md).
+ *   - `cargando-auth`     → todavía no sabemos si hay sesión.
+ *   - `cargando-bodega`   → hay sesión, cargando bodegas accesibles y permisos.
+ *   - `listo`             → contexto completo, se pueden renderizar rutas.
+ *   - `sin-bodegas`       → el user autenticado no tiene bodegas accesibles.
+ *   - `error`             → algo falló (red, 500, etc.).
+ */
+type EstadoBootstrap = 'cargando-auth' | 'cargando-bodega' | 'listo' | 'sin-bodegas' | 'error'
+
 function AppRoutes() {
   const auth = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [bootstrap, setBootstrap] = useState<EstadoBootstrap>('cargando-auth')
 
-  // Hidratar la sesión al montar la app.
+  // ─── Bootstrap: hidrata sesión + bodegas + permisos de la activa ───
+  // Antes: solo `authStore.bootstrap()` y se seguía con la sesión
+  // global. Ahora: si la autenticación es OK, cargamos las bodegas
+  // accesibles y los permisos de la activa antes de renderizar
+  // rutas protegidas. Esto evita el "primer frame con permisos
+  // stale" que producía el bug del sidebar filtrando todo.
   useEffect(() => {
-    if (auth.status === 'cargando') {
-      void authStore.bootstrap()
+    let cancelado = false
+    async function inicializar() {
+      // FIX bug "loader pegado después de logout": si no hay sesión
+      // (logout reciente), NO disparamos el bootstrap. El `handleExit`
+      // ya puso `bootstrap = 'listo'` y navegó a `/`. Re-disparar
+      // este effect podría pisar eso con un `cargando-*` y volver
+      // a mostrar el spinner. Cortamos acá.
+      if (auth.status === 'anonimo') {
+        setBootstrap('listo')
+        return
+      }
+      // 1) Auth
+      if (auth.status === 'cargando') {
+        const ok = await authStore.bootstrap()
+        if (cancelado) return
+        if (!ok) {
+          setBootstrap('listo')
+          return
+        }
+      }
+      const sesion = authStore.getSesion()
+      if (!sesion) {
+        setBootstrap('listo')
+        return
+      }
+      // 2) Superadmin: no opera bodegas, listo.
+      if (sesion.usuario.rol === 'superadmin') {
+        setBootstrap('listo')
+        return
+      }
+      // 3) Bodegas accesibles
+      setBootstrap('cargando-bodega')
+      let bodegas
+      try {
+        const data = await bodegasAccesiblesStore.cargar()
+        bodegas = data.bodegas
+      } catch {
+        if (cancelado) return
+        setBootstrap('error')
+        return
+      }
+      if (cancelado) return
+      if (bodegas.length === 0) {
+        setBootstrap('sin-bodegas')
+        return
+      }
+      // 4) Elegir activa y cargar permisos
+      const guardada = bodegaActivaStore.getId()
+      const activa =
+        bodegasAccesiblesStore.elegirBodegaActiva(guardada) ?? bodegas[0]
+      bodegaActivaStore.set(activa.id, activa.nombre)
+      try {
+        const permisos = await permisosPorBodegaStore.cargar(activa.id, {
+          force: true,
+        })
+        if (cancelado) return
+        authStore.actualizarPermisos(
+          permisos.permisos,
+          permisos.modulePermissions,
+        )
+        setBootstrap('listo')
+      } catch {
+        if (cancelado) return
+        setBootstrap('error')
+      }
     }
+    void inicializar()
+    return () => {
+      cancelado = true
+    }
+    // Solo se dispara cuando cambia el status de auth. El resto
+    // del flujo es síncrono después del primer cambio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.status])
+
+  // Loader global mientras el bootstrap no está listo. No se
+  // renderiza NADA de rutas protegidas hasta que sepamos
+  // quién es el user, qué bodegas tiene y qué permisos tiene
+  // en la activa.
+  if (auth.status === 'cargando' || bootstrap === 'cargando-auth' || bootstrap === 'cargando-bodega') {
+    return <FullScreenLoader />
+  }
 
   // Si está autenticado y va a /login, mandarlo al destino correcto
   // según tenga bodega o no.
@@ -62,18 +162,13 @@ function AppRoutes() {
     return <Navigate to="/superadmin/empresas" replace />
   }
 
-  // Mientras carga el auth, mostrar loader
-  if (auth.status === 'cargando') {
-    return <FullScreenLoader />
-  }
-
   // Si está autenticado, no tiene bodega y está en una ruta que requiere bodega
   // (excepto /onboarding, /waiting, /login, /, /admin/tenants, /admin/*), redirigir
   // al destino correcto. El superadmin no entra acá: el requiereBodega NO se
   // le aplica (porque no es dueño de ninguna bodega).
   if (
     auth.status === 'autenticado' &&
-    !auth.sesion.usuario.bodegaId &&
+    !bodegaActivaStore.getId() &&
     auth.sesion.usuario.rol !== 'superadmin'
   ) {
     const pathRequiresBodega =
@@ -95,7 +190,7 @@ function AppRoutes() {
   // que pueda ver (en lugar de /dashboard, que puede no tenerlo permitido).
   if (
     auth.status === 'autenticado' &&
-    auth.sesion.usuario.bodegaId &&
+    bodegaActivaStore.getId() &&
     location.pathname === '/'
   ) {
     return <Navigate to={rutaInicialSegunPermisos(auth.sesion)} replace />
@@ -109,6 +204,15 @@ function AppRoutes() {
     alertasStore.reset()
     bodegaActivaStore.reset()
     tenantActivoStore.reset()
+    bodegasAccesiblesStore.reset()
+    permisosPorBodegaStore.reset()
+    // FIX bug "loader pegado después de logout":
+    // ANTES poníamos `setBootstrap('cargando-auth')`, pero ese estado
+    // matchea el FullScreenLoader, así que el usuario veía un flash
+    // del spinner. Como no hay sesión activa, no necesitamos el
+    // bootstrap multibodega → vamos directo a `listo` y la próxima
+    // ruta (Landing o Login) se renderiza sin loader.
+    setBootstrap('listo')
     navigate('/', { replace: true })
   }
 
@@ -116,6 +220,7 @@ const isLanding = location.pathname === '/'
 
   return (
     <RealtimeProvider>
+      <ToastBridge />
       {/* El Navbar solo aparece en / y /login */}
       {isLanding && <Navbar />}
 
@@ -205,6 +310,66 @@ const isLanding = location.pathname === '/'
                 <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
               ) : (
                 <Dashboard view="inventario" onExit={handleExit} />
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/inventario/categorias"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <Dashboard view="categorias" onExit={handleExit} />
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/inventario/marcas"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <Dashboard view="marcas" onExit={handleExit} />
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/inventario/proveedores"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <Dashboard view="proveedores" onExit={handleExit} />
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/inventario/ubicaciones"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <Dashboard view="ubicaciones" onExit={handleExit} />
               )}
             </RequireAuth>
           }
@@ -377,6 +542,22 @@ const isLanding = location.pathname === '/'
           }
         />
 
+        {/* Perfil: accesible para cualquier user autenticado (no requiere
+            bodega, no requiere permiso especial). */}
+        <Route
+          path="/perfil"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              <AppLayout onExit={handleExit}>
+                <Perfil />
+              </AppLayout>
+            </RequireAuth>
+          }
+        />
+
         {/* Compatibilidad con la ruta anterior del panel. */}
         <Route
           path="/admin/tenants"
@@ -416,6 +597,22 @@ const isLanding = location.pathname === '/'
           />
         ))}
 
+        {/* /sin-permisos — fallback cuando el user no tiene permiso `ver`
+            en ningún módulo de la bodega activa (Sprint 3 Fase 6). */}
+        <Route
+          path="/sin-permisos"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              <AppLayout onExit={handleExit}>
+                <SinPermisosBodega onLogout={handleExit} />
+              </AppLayout>
+            </RequireAuth>
+          }
+        />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </RealtimeProvider>
@@ -432,7 +629,7 @@ function rutaSegunSesion(rol: string, bodegaId: string | null): string {
 
 function FullScreenLoader() {
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-background">
+    <div className="h-dvh w-screen flex items-center justify-center bg-background">
       <div className="flex items-center gap-3 text-muted-foreground">
         <span
           className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary rounded-full animate-spin"
@@ -451,9 +648,11 @@ function FullScreenLoader() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

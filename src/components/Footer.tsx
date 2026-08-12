@@ -6,9 +6,12 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="border-t border-border py-12">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+    <footer
+      className="border-t border-border py-10 sm:py-12"
+      style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8">
           <div className="flex items-center">
             <span
               className="text-foreground text-2xl tracking-wider"
@@ -18,7 +21,7 @@ export function Footer() {
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-8 md:gap-16">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 md:gap-12 lg:gap-16">
             {Object.entries(footerLinks).map(([section, links]) => (
               <div key={section}>
                 <div
@@ -44,7 +47,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 pt-6 border-t border-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="mt-10 sm:mt-12 pt-6 border-t border-border flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <p
             className="text-xs text-muted-foreground"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}

@@ -8,6 +8,7 @@ import {
   XCircle,
   Send,
   Lock,
+  ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useBodegaActiva } from '../store/bodegaActiva'
@@ -25,6 +26,7 @@ import { AccionOrdenModal } from './AccionOrdenModal'
 import { WizardAprobacion, itemsParaWizard } from './WizardAprobacion'
 import { Pagination } from './Pagination'
 import { PageHeader } from './PageHeader'
+import { Modal } from './Modal'
 
 type TabKey = 'TODAS' | EstadoPedido
 
@@ -165,7 +167,7 @@ export function Ordenes() {
         actions={
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
             style={{ borderRadius: '0.25rem' }}
           >
             <Plus size={13} />
@@ -174,7 +176,7 @@ export function Ordenes() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
 
           {/* Stats — usan `total` del back (que ya filtra por operador)
               y cuentan los estados sobre la página actual. */}
@@ -224,6 +226,17 @@ export function Ordenes() {
               })}
             </div>
           </div>
+
+          {/* Mobile: botón "+ Nueva Solicitud" full-width (el header no se ve en mobile) */}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="lg:hidden w-full min-h-[44px] inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 active:opacity-80 transition-opacity"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <Plus size={16} />
+            Nueva Solicitud
+          </button>
 
           {/* Tabla */}
           <div
@@ -287,82 +300,115 @@ export function Ordenes() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr
-                      className="border-b border-border bg-muted/30"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    >
-                      <Th>Código</Th>
-                      <Th>Productos</Th>
-                      <Th>Motivo</Th>
-                      <Th>Estado</Th>
-                      <Th>Revisión</Th>
-                      <Th>Enviada</Th>
-                      <Th className="text-right">Acción</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtradas.map((o) => (
-                      <tr
-                        key={o.id}
+              <>
+                {/* MOBILE: lista compacta (Código / Estado / Revisión) → tap = modal detalle */}
+                <ul className="sm:hidden divide-y divide-border">
+                  {filtradas.map((o) => (
+                    <li key={o.id}>
+                      <button
+                        type="button"
                         onClick={() => setDetalle(o)}
-                        className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                        className="w-full text-left px-4 py-3.5 hover:bg-muted/30 active:bg-muted/50 transition-colors flex items-center gap-3 min-h-[60px]"
                       >
-                        <Td>
-                          <span
-                            className="text-primary"
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className="text-sm text-primary truncate"
                             style={{
                               fontFamily: "'JetBrains Mono', monospace",
                               fontWeight: 500,
                             }}
                           >
                             {o.codigo}
-                          </span>
-                        </Td>
-                        <Td>
-                          <div className="text-sm text-foreground">
-                            {o.items.length === 1 ? '1 ítem' : `${o.items.length} ítems`}
                           </div>
-                        </Td>
-                        <Td>
-                          <span className="text-sm text-muted-foreground">
-                            {o.motivo || '—'}
-                          </span>
-                        </Td>
-                        <Td>
-                          <EstadoBadge estado={o.estadoNombre} />
-                        </Td>
-                        <Td>
-                          <RevisionBadge estado={o.revisionEstado} />
-                        </Td>
-                        <Td>
-                          <span
-                            className="text-xs text-muted-foreground"
-                            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                          >
-                            {o.createdAtLabel}
-                          </span>
-                        </Td>
-                        <Td>
-                          <div
-                            className="flex justify-end"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <AccionOperador
-                              pedido={o}
-                              onRevisarTecnico={() => abrirWizardTecnico(o)}
-                              onCancelar={() => setAccionCancel(o)}
-                              onVer={() => setDetalle(o)}
-                            />
+                          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                            <EstadoBadge estado={o.estadoNombre} />
+                            <RevisionBadge estado={o.revisionEstado} />
                           </div>
-                        </Td>
+                        </div>
+                        <ChevronRight size={18} className="text-muted-foreground shrink-0" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* DESKTOP: tabla completa intacta */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead>
+                      <tr
+                        className="border-b border-border bg-muted/30"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        <Th>Código</Th>
+                        <Th>Productos</Th>
+                        <Th>Motivo</Th>
+                        <Th>Estado</Th>
+                        <Th>Revisión</Th>
+                        <Th>Enviada</Th>
+                        <Th className="text-right">Acción</Th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filtradas.map((o) => (
+                        <tr
+                          key={o.id}
+                          onClick={() => setDetalle(o)}
+                          className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                        >
+                          <Td>
+                            <span
+                              className="text-primary"
+                              style={{
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontWeight: 500,
+                              }}
+                            >
+                              {o.codigo}
+                            </span>
+                          </Td>
+                          <Td>
+                            <div className="text-sm text-foreground">
+                              {o.items.length === 1 ? '1 ítem' : `${o.items.length} ítems`}
+                            </div>
+                          </Td>
+                          <Td>
+                            <span className="text-sm text-muted-foreground">
+                              {o.motivo || '—'}
+                            </span>
+                          </Td>
+                          <Td>
+                            <EstadoBadge estado={o.estadoNombre} />
+                          </Td>
+                          <Td>
+                            <RevisionBadge estado={o.revisionEstado} />
+                          </Td>
+                          <Td>
+                            <span
+                              className="text-xs text-muted-foreground"
+                              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                            >
+                              {o.createdAtLabel}
+                            </span>
+                          </Td>
+                          <Td>
+                            <div
+                              className="flex justify-end"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <AccionOperador
+                                pedido={o}
+                                onRevisarTecnico={() => abrirWizardTecnico(o)}
+                                onCancelar={() => setAccionCancel(o)}
+                                onVer={() => setDetalle(o)}
+                              />
+                            </div>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
             <Pagination
               page={page}
@@ -380,7 +426,19 @@ export function Ordenes() {
         </div>
 
       {open && <CrearOrdenModal onClose={() => setOpen(false)} onCreated={recargar} />}
-      {detalle && <OrdenDetalleModal pedido={detalle} onClose={() => setDetalle(null)} />}
+      {detalle && (
+        <OrdenDetalleModal
+          pedido={detalle}
+          onClose={() => setDetalle(null)}
+          onRevisarTecnico={() => {
+            setDetalle(null)
+            void abrirWizardTecnico(detalle)
+          }}
+          onCancelar={() => {
+            setAccionCancel(detalle)
+          }}
+        />
+      )}
 
       {accionCancel && (
         <AccionOrdenModal
@@ -404,15 +462,12 @@ export function Ordenes() {
       )}
 
       {cargandoTecnico && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div
-            className="bg-card border border-border p-6 flex items-center gap-3"
-            style={{ borderRadius: '0.25rem' }}
-          >
+        <Modal open onClose={() => {}} title="Cargando" size="sm" dismissOnOverlay={false}>
+          <div className="p-6 flex items-center gap-3">
             <Loader2 size={20} className="text-primary animate-spin" />
             <span className="text-foreground">Cargando pedido…</span>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -432,29 +487,29 @@ function WizardTecnicoModal({
   const steps = itemsParaWizard(pedidoCompleto, 'tecnico')
   if (steps.length === 0) {
     return (
-      <div
-        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <div
-          className="bg-card border border-border p-6 max-w-md"
-          onClick={(e) => e.stopPropagation()}
-          style={{ borderRadius: '0.25rem' }}
-        >
-          <p className="text-foreground mb-4">
-            No hay items pendientes para revisar en este pedido.
-          </p>
+      <Modal
+        open
+        onClose={onClose}
+        title="Sin items para revisar"
+        description={pedido.codigo}
+        size="sm"
+        footer={
           <div className="flex justify-end">
             <button
+              type="button"
               onClick={onClose}
-              className="px-3 py-2 border border-border text-sm"
+              className="min-h-[44px] px-3 py-2 border border-border text-sm"
               style={{ borderRadius: '0.25rem' }}
             >
               Cerrar
             </button>
           </div>
+        }
+      >
+        <div className="p-5 text-sm text-foreground">
+          No hay items pendientes para revisar en este pedido.
         </div>
-      </div>
+      </Modal>
     )
   }
   return (

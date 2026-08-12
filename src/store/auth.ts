@@ -112,6 +112,29 @@ export const authStore = {
     }
   },
 
+  /**
+   * Actualiza SOLO los permisos de la sesión actual, sin tocar
+   * `usuario.bodegas`, `rol` ni nada más. Lo usa el flujo de "cambio
+   * de bodega activa" del Sidebar: al cambiar de bodega, los permisos
+   * efectivos cambian (rol distinto, override distinto) y queremos
+   * que todos los componentes que leen `auth.sesion.permisos` (botones
+   * de crear/editar/eliminar, badges, etc.) se enteren sin tener que
+   * reloggear ni pegarle a `/auth/me` (que re-emite el JWT).
+   *
+   * Si no hay sesión, no hace nada.
+   */
+  actualizarPermisos(permisos: string[], modulePermissions: ModulePermissionMap) {
+    if (estado.status !== 'autenticado') return
+    setEstado({
+      status: 'autenticado',
+      sesion: {
+        ...estado.sesion,
+        permisos,
+        modulePermissions,
+      },
+    })
+  },
+
   async logout(): Promise<void> {
     try {
       await api.post('/auth/logout')

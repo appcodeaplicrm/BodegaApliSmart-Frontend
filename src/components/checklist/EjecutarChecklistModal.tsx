@@ -1,19 +1,27 @@
 /**
- * Modal para ejecutar un checklist (wizard de marcado de ítems).
+ * Modal para ejecutar un checklist.
  *
  * - Carga el detalle de la asignación al abrir.
- * - Por cada ítem muestra: texto + toggle OK / NO OK + campo de
- *   observación (solo si NO OK).
- * - Permite guardado parcial (solo algunos ítems marcados).
+ * - El comportamiento por item depende del `htmlKind` de la plantilla:
+ *   - "escaleras" → 2 botones: OK / NO OK (con observación si NO).
+ *     Además permite subir foto de evidencia.
+ *   - "epp"       → 3 botones: BUEN ESTADO / MAL ESTADO / NO PRESENTA.
+ *     Sin fotos (no aplica). Sin `requerido` (todos son requeridos).
+ * - Permite guardado parcial (solo algunos items marcados).
  * - Si marca TODOS los ítems, al hacer click en "Cerrar checklist"
  *   el back calcula el resultado y la asignación pasa a `completado`.
  * - Si la asignación ya estaba completada, muestra vista de solo
  *   lectura con el resultado final.
+ *
+ * Convención del campo `ok` en EPP:
+ *   - `'bueno'`      = BUEN ESTADO
+ *   - `'malo'`       = MAL ESTADO (se pide observación)
+ *   - `'noPresenta'` = NO PRESENTA
+ *   - `undefined`    = no marcado
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Modal } from './Modal'
+import { Modal } from '../Modal'
 import {
-  X,
   Check,
   XCircle,
   AlertCircle,
@@ -24,12 +32,18 @@ import {
   Upload,
   Camera,
   Image as ImageIcon,
+  Minus,
 } from 'lucide-react'
 import { ejecutarChecklist, obtenerAsignacion, subirFoto } from './api'
 import { TomarFotoModal } from './TomarFotoModal'
 import type { CkAsignacionDetalle } from './types'
 
-type Props = {
+/** Marca de un item del checklist. Usamos string en vez de boolean|null
+ * para evitar confundir "no marcado" (undefined) con "NO PRESENTA"
+ * (string explícito). */
+type MarkValue = 'bueno' | 'malo' | 'noPresenta'
+
+type EjecutarChecklistModalProps = {
   /** ID de la asignación a abrir. */
   asignacionId: string
   /** Bodega activa (para que el back autorice). */
@@ -48,11 +62,13 @@ type Props = {
 }
 
 type Draft = {
-  /** itemId → ok (true/false) o null si no marcado. */
-  marks: Record<string, boolean | null>
-  /** itemId → observación si fue NO OK. */
+  /** itemId → marca. Usa string en vez de null/boolean para que
+   * "NO PRESENTA" sea un valor explícito (no la ausencia de valor)
+   * y no se confunda con `undefined` (no marcado). */
+  marks: Record<string, MarkValue>
+  /** itemId → observación si fue NO OK / MAL ESTADO. */
   obs: Record<string, string>
-  /** itemId → key de la foto de evidencia subida (opcional). */
+  /** itemId → key de la foto de evidencia subida (opcional, solo escaleras). */
   fotos: Record<string, string | null>
   /** Observación general opcional al cerrar. */
   obsGeneral: string
@@ -68,7 +84,7 @@ export function EjecutarChecklistModal({
   onClose,
   onChanged,
   readOnly = false,
-}: Props) {
+}: EjecutarChecklistModalProps) {
   const [detalle, setDetalle] = useState<CkAsignacionDetalle | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft())
   const [loading, setLoading] = useState(true)
@@ -77,6 +93,8 @@ export function EjecutarChecklistModal({
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const isClosed = detalle?.estado === 'completado' || readOnly
+  const htmlKind: 'escaleras' | 'epp' = detalle?.plantilla.htmlKind ?? 'escaleras'
+  const isEpp = htmlKind === 'epp'
 
   // Carga inicial
   useEffect(() => {
@@ -87,13 +105,20 @@ export function EjecutarChecklistModal({
       .then((d) => {
         if (cancel) return
         setDetalle(d)
-        // Pre-rellenar el draft con lo que ya estuviera marcado
-        // (caso "guardado parcial" anterior).
-        const marks: Record<string, boolean | null> = {}
+        const marks: Record<string, MarkValue> = {}
         const obs: Record<string, string> = {}
         const fotos: Record<string, string | null> = {}
         for (const it of d.items) {
-          marks[it.itemId] = it.ok
+          // Convertir `boolean | null` del back a MarkValue del front.
+          // null = NO PRESENTA → 'noPresenta'.
+          // true = bueno → 'bueno'. false = malo → 'malo'.
+          // null también puede ser "no marcado aún" (CkEjecucionItem sin
+          // fila) — en ese caso NO pre-cargamos el mark y queda undefined.
+          // En la práctica el back SIEMPRE devuelve null explícito si
+          // fue seteado por el usuario, así que es seguro.
+          if (it.ok === true) marks[it.itemId] = 'bueno'
+          else if (it.ok === false) marks[it.itemId] = 'malo'
+          else if (it.ok === null) marks[it.itemId] = 'noPresenta'
           if (it.observacion) obs[it.itemId] = it.observacion
           if (it.fotoKey) fotos[it.itemId] = it.fotoKey
         }
@@ -117,20 +142,30 @@ export function EjecutarChecklistModal({
   }, [asignacionId, bodegaId])
 
   // Métricas derivadas
+  // Las marcas usan string en vez de boolean|null para evitar
+  // confundir "no marcado" (undefined) con "NO PRESENTA" ('noPresenta').
+  //   - undefined   → no se tocó todavía
+  //   - 'bueno'     → BUEN ESTADO
+  //   - 'malo'      → MAL ESTADO
+  //   - 'noPresenta' → NO PRESENTA
   const totalMarcados = useMemo(
-    () => Object.values(draft.marks).filter((v) => v !== null && v !== undefined).length,
+    () =>
+      Object.values(draft.marks).filter(
+        (v) => v !== undefined,
+      ).length,
     [draft.marks],
   )
   const totalItems = detalle?.items.length ?? 0
   const progreso = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0
   const puedeCerrar = totalMarcados === totalItems && totalItems > 0
 
-  const setMark = (itemId: string, ok: boolean) => {
+  const setMark = (itemId: string, ok: MarkValue) => {
     setDraft((prev) => ({
       ...prev,
       marks: { ...prev.marks, [itemId]: ok },
-      // Si vuelve a OK, limpiamos la observación.
-      obs: ok ? { ...prev.obs, [itemId]: '' } : prev.obs,
+      // Si NO es "malo", limpiamos la observación (los items bueno/noPresenta
+      // no requieren observación, solo los "malo").
+      obs: ok === 'malo' ? prev.obs : { ...prev.obs, [itemId]: '' },
     }))
   }
 
@@ -138,11 +173,6 @@ export function EjecutarChecklistModal({
     setDraft((prev) => ({ ...prev, obs: { ...prev.obs, [itemId]: value } }))
   }
 
-  /**
-   * Setea la key de la foto de un ítem. Se llama desde los handlers
-   * de "Subir foto" / "Tomar foto" del ItemRow, después de subir
-   * el blob al storage. Si `value` es `null`, la limpiamos.
-   */
   const setFoto = (itemId: string, value: string | null) => {
     setDraft((prev) => ({ ...prev, fotos: { ...prev.fotos, [itemId]: value } }))
   }
@@ -151,25 +181,27 @@ export function EjecutarChecklistModal({
     if (!detalle) return
     setSaveError(null)
 
-    // Armamos el payload solo con los ítems que tienen marca.
     const items = detalle.items
-      .filter((it) => draft.marks[it.itemId] !== null && draft.marks[it.itemId] !== undefined)
-      .map((it) => ({
-        itemId: it.itemId,
-        ok: draft.marks[it.itemId] as boolean,
-        observacion: draft.obs[it.itemId]?.trim() || undefined,
-        // Si el user subió una foto en este ítem, la mandamos. Si la
-        // tenía del server y NO la cambió, también la mandamos (el back
-        // hace upsert). Si la limpió, mandamos null.
-        fotoKey: draft.fotos[it.itemId] ?? null,
-      }))
+      .filter((it) => draft.marks[it.itemId] !== undefined)
+      .map((it) => {
+        const mark = draft.marks[it.itemId] as MarkValue
+        // Convertir MarkValue → boolean|null del back.
+        // 'bueno' → true, 'malo' → false, 'noPresenta' → null.
+        const okValue: boolean | null =
+          mark === 'bueno' ? true : mark === 'malo' ? false : null
+        return {
+          itemId: it.itemId,
+          ok: okValue,
+          observacion: draft.obs[it.itemId]?.trim() || undefined,
+          fotoKey: draft.fotos[it.itemId] ?? null,
+        }
+      })
 
     if (items.length === 0) {
       setSaveError('Marca al menos un ítem antes de guardar.')
       return
     }
 
-    // Si quiere cerrar, todos los ítems deben estar marcados.
     if (cerrar && !puedeCerrar) {
       setSaveError('Para cerrar el checklist, marca todos los ítems.')
       return
@@ -186,7 +218,6 @@ export function EjecutarChecklistModal({
         bodegaId,
       )
       setDetalle(actualizado)
-      // Si cerró, no seguimos permitiendo editar.
       await onChanged()
     } catch (e) {
       setSaveError((e as Error).message ?? 'No se pudo guardar.')
@@ -196,91 +227,98 @@ export function EjecutarChecklistModal({
   }
 
   return (
-    <Modal zIndex={100} full>
-      <div
-        className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col"
-        style={{ borderRadius: '0.5rem' }}
-      >
-        {loading ? (
-          <ModalLoading />
-        ) : loadError ? (
-          <ModalError message={loadError} onClose={onClose} />
-        ) : !detalle ? (
-          <ModalError message="Sin datos." onClose={onClose} />
-        ) : (
-          <>
-            <Header
-              detalle={detalle}
-              progreso={progreso}
-              totalMarcados={totalMarcados}
-              onClose={onClose}
-              readOnly={readOnly}
-            />
+    <Modal
+      open
+      onClose={onClose}
+      title={
+        detalle?.plantilla?.nombre
+          ? `Ejecutar checklist · ${detalle.plantilla.nombre}`
+          : 'Ejecutar checklist'
+      }
+      size="lg"
+      contentClassName="max-h-[90dvh] sm:max-h-[90dvh] flex flex-col"
+      footer={
+        detalle && !loadError ? (
+          <Footer
+            isClosed={isClosed}
+            puedeCerrar={puedeCerrar}
+            saving={saving}
+            isEpp={isEpp}
+            onClose={onClose}
+            onGuardarParcial={() => handleGuardar(false)}
+            onCerrar={() => handleGuardar(true)}
+          />
+        ) : null
+      }
+    >
+      {loading ? (
+        <ModalLoading />
+      ) : loadError ? (
+        <ModalError message={loadError} onClose={onClose} />
+      ) : !detalle ? (
+        <ModalError message="Sin datos." onClose={onClose} />
+      ) : (
+        <>
+          <Header
+            detalle={detalle}
+            progreso={progreso}
+            totalMarcados={totalMarcados}
+            readOnly={readOnly}
+            isEpp={isEpp}
+          />
 
-            {/* Lista de ítems */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
-              {detalle.items.map((it, idx) => (
-                <ItemRow
-                  key={it.itemId}
-                  index={idx + 1}
-                  texto={it.texto}
-                  requerido={it.requerido}
-                  ok={draft.marks[it.itemId] ?? null}
-                  observacion={draft.obs[it.itemId] ?? ''}
-                  fotoKey={draft.fotos[it.itemId] ?? it.fotoKey ?? null}
-                  disabled={isClosed}
-                  bodegaId={bodegaId}
-                  onSetMark={(v) => setMark(it.itemId, v)}
-                  onSetObs={(v) => setObs(it.itemId, v)}
-                  onSetFoto={(key) => setFoto(it.itemId, key)}
-                  onClearFoto={() => setFoto(it.itemId, null)}
-                />
-              ))}
+          <div className="px-5 py-4 space-y-2">
+            {detalle.items.map((it, idx) => (
+              <ItemRow
+                key={it.itemId}
+                index={idx + 1}
+                texto={it.texto}
+                requerido={it.requerido}
+                ok={draft.marks[it.itemId]}
+                observacion={draft.obs[it.itemId] ?? ''}
+                fotoKey={!isEpp ? (draft.fotos[it.itemId] ?? it.fotoKey ?? null) : null}
+                disabled={isClosed}
+                bodegaId={bodegaId}
+                isEpp={isEpp}
+                onSetMark={(v) => setMark(it.itemId, v)}
+                onSetObs={(v) => setObs(it.itemId, v)}
+                onSetFoto={(key) => setFoto(it.itemId, key)}
+                onClearFoto={() => setFoto(it.itemId, null)}
+              />
+            ))}
 
-              {/* Observación general (solo si NO está cerrado) */}
-              {!isClosed && (
-                <div className="pt-2 border-t border-border/40">
-                  <label className="block">
-                    <span
-                      className="block text-[10px] text-muted-foreground tracking-widest mb-1"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    >
-                      OBSERVACIÓN GENERAL (OPCIONAL)
-                    </span>
-                    <textarea
-                      value={draft.obsGeneral}
-                      onChange={(e) =>
-                        setDraft((prev) => ({ ...prev, obsGeneral: e.target.value }))
-                      }
-                      rows={2}
-                      placeholder="Notas sobre la ejecución, contexto, advertencias…"
-                      className="w-full bg-background border border-border px-3 py-1.5 text-sm focus:border-primary/50 outline-none resize-none"
-                      style={{ borderRadius: '0.25rem' }}
-                    />
-                  </label>
-                </div>
-              )}
+            {!isClosed && (
+              <div className="pt-2 border-t border-border/40">
+                <label className="block">
+                  <span
+                    className="block text-[10px] text-muted-foreground tracking-widest mb-1"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    OBSERVACIÓN GENERAL (OPCIONAL)
+                  </span>
+                  <textarea
+                    value={draft.obsGeneral}
+                    onChange={(e) =>
+                      setDraft((prev) => ({ ...prev, obsGeneral: e.target.value }))
+                    }
+                    rows={2}
+                    placeholder="Notas sobre la ejecución, contexto, advertencias…"
+                    className="w-full bg-background border border-border px-3 py-1.5 text-sm focus:border-primary/50 outline-none resize-none"
+                    style={{ borderRadius: '0.25rem' }}
+                  />
+                </label>
+              </div>
+            )}
 
-              {saveError && (
-                <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
-                  style={{ borderRadius: '0.25rem' }}>
-                  <AlertCircle size={12} /> {saveError}
-                </div>
-              )}
-            </div>
-
-            {/* Footer con acciones */}
-            <Footer
-              isClosed={isClosed}
-              puedeCerrar={puedeCerrar}
-              saving={saving}
-              onClose={onClose}
-              onGuardarParcial={() => handleGuardar(false)}
-              onCerrar={() => handleGuardar(true)}
-            />
-          </>
-        )}
-      </div>
+            {saveError && (
+              <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+                style={{ borderRadius: '0.25rem' }}>
+                <AlertCircle size={12} /> {saveError}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </Modal>
   )
 }
@@ -291,21 +329,21 @@ function Header({
   detalle,
   progreso,
   totalMarcados,
-  onClose,
   readOnly,
+  isEpp,
 }: {
   detalle: CkAsignacionDetalle
   progreso: number
   totalMarcados: number
-  onClose: () => void
   readOnly: boolean
+  isEpp: boolean
 }) {
   const isClosed = detalle.estado === 'completado'
   return (
-    <div className="px-5 py-4 border-b border-border">
+    <div className="px-5 py-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             {(isClosed || readOnly) && (
               <Lock size={12} className="text-muted-foreground shrink-0" />
             )}
@@ -315,6 +353,12 @@ function Header({
             >
               {detalle.plantilla.nombre}
             </h3>
+            <span
+              className="px-1.5 py-0.5 text-[9px] border bg-muted text-muted-foreground border-border shrink-0"
+              style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {isEpp ? 'EPP' : 'ESCALERAS'}
+            </span>
           </div>
           <div className="text-[11px] text-muted-foreground flex items-center gap-3 flex-wrap">
             <span>Técnico: <span className="text-foreground">{detalle.tecnico.nombre}</span></span>
@@ -324,12 +368,8 @@ function Header({
             )}
           </div>
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0">
-          <X size={16} />
-        </button>
       </div>
 
-      {/* Barra de progreso */}
       <div className="mt-3 flex items-center gap-3">
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <div
@@ -360,6 +400,7 @@ function ItemRow({
   fotoKey,
   disabled,
   bodegaId,
+  isEpp,
   onSetMark,
   onSetObs,
   onSetFoto,
@@ -368,19 +409,18 @@ function ItemRow({
   index: number
   texto: string
   requerido: boolean
-  ok: boolean | null
+  ok: MarkValue
   observacion: string
   fotoKey: string | null
   disabled: boolean
   bodegaId: string
-  onSetMark: (v: boolean) => void
+  isEpp: boolean
+  onSetMark: (v: MarkValue) => void
   onSetObs: (v: string) => void
   onSetFoto: (key: string) => void
   onClearFoto: () => void
 }) {
-  // Estado local: ¿está abierto el modal de "Tomar foto" para este ítem?
   const [showCamera, setShowCamera] = useState(false)
-  // Estado local: ¿está subiendo? (muestra spinner en el botón de "Subir")
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -412,16 +452,19 @@ function ItemRow({
     }
   }
 
+  // Colores del border según estado
+  const colorClass =
+    ok === 'bueno'
+      ? 'border-secondary/30 bg-secondary/5'
+      : ok === 'malo'
+        ? 'border-primary/30 bg-primary/5'
+        : ok === 'noPresenta'
+          ? 'border-border bg-muted/30'
+          : 'border-border bg-background'
+
   return (
     <div
-      className={[
-        'rounded-md border p-3 transition-colors',
-        ok === true
-          ? 'border-secondary/30 bg-secondary/5'
-          : ok === false
-            ? 'border-primary/30 bg-primary/5'
-            : 'border-border bg-background',
-      ].join(' ')}
+      className={['rounded-md border p-3 transition-colors', colorClass].join(' ')}
       style={{ borderRadius: '0.25rem' }}
     >
       <div className="flex items-start gap-3">
@@ -444,26 +487,25 @@ function ItemRow({
             )}
           </div>
 
-          {/* Campo de observación si fue NO OK */}
-          {ok === false && !disabled && (
+          {/* Observación si fue MAL ESTADO */}
+          {ok === 'malo' && !disabled && (
             <input
               type="text"
               value={observacion}
               onChange={(e) => onSetObs(e.target.value)}
-              placeholder="Describe la incidencia…"
+              placeholder={isEpp ? 'Detalle del daño o problema…' : 'Describe la incidencia…'}
               className="mt-2 w-full bg-background border border-border px-2 py-1 text-xs focus:border-primary/50 outline-none"
               style={{ borderRadius: '0.25rem' }}
             />
           )}
-          {ok === false && disabled && observacion && (
+          {ok === 'malo' && disabled && observacion && (
             <p className="mt-1 text-xs text-muted-foreground italic">
               "{observacion}"
             </p>
           )}
 
-          {/* Botones de foto y preview (solo si NO está disabled y el ítem
-              está marcado) */}
-          {!disabled && ok !== null && (
+          {/* Botones de foto y preview (solo para ESCALERAS, no EPP) */}
+          {!disabled && !isEpp && ok !== 'noPresenta' && (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -515,7 +557,7 @@ function ItemRow({
               )}
             </div>
           )}
-          {disabled && fotoKey && (
+          {!isEpp && disabled && fotoKey && (
             <div className="mt-2 flex items-center gap-2">
               <span
                 className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-secondary/15 text-secondary border border-secondary/20"
@@ -527,40 +569,88 @@ function ItemRow({
           )}
         </div>
 
-        {/* Botones OK / NO OK */}
+        {/* Botones de marcado: 2 para escaleras, 3 para EPP */}
         {!disabled && (
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => onSetMark(true)}
-              className={[
-                'inline-flex items-center justify-center w-8 h-8 border transition-colors',
-                ok === true
-                  ? 'bg-secondary/20 text-secondary border-secondary/40'
-                  : 'bg-background text-muted-foreground border-border hover:border-secondary/40',
-              ].join(' ')}
-              style={{ borderRadius: '0.25rem' }}
-              title="OK"
-            >
-              <Check size={14} />
-            </button>
-            <button
-              onClick={() => onSetMark(false)}
-              className={[
-                'inline-flex items-center justify-center w-8 h-8 border transition-colors',
-                ok === false
-                  ? 'bg-primary/20 text-primary border-primary/40'
-                  : 'bg-background text-muted-foreground border-border hover:border-primary/40',
-              ].join(' ')}
-              style={{ borderRadius: '0.25rem' }}
-              title="No OK"
-            >
-              <XCircle size={14} />
-            </button>
+            {isEpp ? (
+              <>
+                {/* BUEN ESTADO (verde) */}
+                <button
+                  onClick={() => onSetMark('bueno')}
+                  className={[
+                    'inline-flex items-center justify-center w-8 h-8 border transition-colors',
+                    ok === 'bueno'
+                      ? 'bg-secondary/20 text-secondary border-secondary/40'
+                      : 'bg-background text-muted-foreground border-border hover:border-secondary/40',
+                  ].join(' ')}
+                  style={{ borderRadius: '0.25rem' }}
+                  title="BUEN ESTADO"
+                >
+                  <Check size={14} />
+                </button>
+                {/* MAL ESTADO (rojo) */}
+                <button
+                  onClick={() => onSetMark('malo')}
+                  className={[
+                    'inline-flex items-center justify-center w-8 h-8 border transition-colors',
+                    ok === 'malo'
+                      ? 'bg-primary/20 text-primary border-primary/40'
+                      : 'bg-background text-muted-foreground border-border hover:border-primary/40',
+                  ].join(' ')}
+                  style={{ borderRadius: '0.25rem' }}
+                  title="MAL ESTADO"
+                >
+                  <XCircle size={14} />
+                </button>
+                {/* NO PRESENTA (gris) */}
+                <button
+                  onClick={() => onSetMark('noPresenta')}
+                  className={[
+                    'inline-flex items-center justify-center w-8 h-8 border transition-colors',
+                    ok === 'noPresenta'
+                      ? 'bg-muted text-muted-foreground border-muted-foreground/40'
+                      : 'bg-background text-muted-foreground border-border hover:border-foreground/30',
+                  ].join(' ')}
+                  style={{ borderRadius: '0.25rem' }}
+                  title="NO PRESENTA"
+                >
+                  <Minus size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => onSetMark('bueno')}
+                  className={[
+                    'inline-flex items-center justify-center w-8 h-8 border transition-colors',
+                    ok === 'bueno'
+                      ? 'bg-secondary/20 text-secondary border-secondary/40'
+                      : 'bg-background text-muted-foreground border-border hover:border-secondary/40',
+                  ].join(' ')}
+                  style={{ borderRadius: '0.25rem' }}
+                  title="OK"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  onClick={() => onSetMark('malo')}
+                  className={[
+                    'inline-flex items-center justify-center w-8 h-8 border transition-colors',
+                    ok === 'malo'
+                      ? 'bg-primary/20 text-primary border-primary/40'
+                      : 'bg-background text-muted-foreground border-border hover:border-primary/40',
+                  ].join(' ')}
+                  style={{ borderRadius: '0.25rem' }}
+                  title="No OK"
+                >
+                  <XCircle size={14} />
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {/* Modal de cámara en vivo (solo si está abierto) */}
       {showCamera && (
         <TomarFotoModal
           label={`— ${texto.slice(0, 40)}${texto.length > 40 ? '…' : ''}`}
@@ -576,6 +666,7 @@ function Footer({
   isClosed,
   puedeCerrar,
   saving,
+  isEpp,
   onClose,
   onGuardarParcial,
   onCerrar,
@@ -583,13 +674,14 @@ function Footer({
   isClosed: boolean
   puedeCerrar: boolean
   saving: boolean
+  isEpp: boolean
   onClose: () => void
   onGuardarParcial: () => void
   onCerrar: () => void
 }) {
   if (isClosed) {
     return (
-      <div className="px-5 py-3 border-t border-border flex items-center justify-end">
+      <div className="flex items-center justify-end">
         <button
           onClick={onClose}
           className="px-3 py-1.5 text-xs border border-border hover:border-primary/40"
@@ -602,7 +694,7 @@ function Footer({
   }
 
   return (
-    <div className="px-5 py-3 border-t border-border flex items-center justify-between gap-2">
+    <div className="flex items-center justify-between gap-2">
       <span
         className="text-[10px] text-muted-foreground"
         style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -633,7 +725,7 @@ function Footer({
           style={{ borderRadius: '0.25rem' }}
         >
           {saving ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-          Cerrar checklist
+          {isEpp ? 'Cerrar inspección' : 'Cerrar checklist'}
         </button>
       </div>
     </div>

@@ -11,6 +11,7 @@ import {
   Package,
   AlertCircle,
   Send,
+  ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useBodegaActiva } from '../store/bodegaActiva'
@@ -252,8 +253,8 @@ export function Devoluciones() {
         subtitle={`STOCKPRO · ${usuarioRol.toUpperCase()}`}
       />
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
-        <div className="space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <StatTile label="Total" value={String(visibles.length)} accent="text-foreground" />
@@ -476,93 +477,135 @@ export function Devoluciones() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr
-                      className="border-b border-border bg-muted/30"
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    >
-                      <Th>Código</Th>
-                      <Th>Pedido</Th>
-                      <Th>Operador</Th>
-                      <Th>Progreso</Th>
-                      <Th>Estado</Th>
-                      <Th>Enviada</Th>
-                      <Th className="text-right">Acción</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtradas.map((d) => (
-                      <tr
-                        key={d.id}
+              <>
+                {/* MOBILE: lista compacta (Código / Pedido / Progreso / Estado) → tap = modal detalle */}
+                <ul className="sm:hidden divide-y divide-border">
+                  {filtradas.map((d) => (
+                    <li key={d.id}>
+                      <button
+                        type="button"
                         onClick={() => setDetalle(d)}
-                        className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                        className="w-full text-left px-4 py-3.5 hover:bg-muted/30 active:bg-muted/50 transition-colors flex items-center gap-3 min-h-[60px]"
                       >
-                        <Td>
-                          <span
-                            className="text-primary"
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className="text-sm text-primary truncate"
                             style={{
                               fontFamily: "'JetBrains Mono', monospace",
                               fontWeight: 500,
                             }}
                           >
                             {d.codigo}
-                          </span>
-                        </Td>
-                        <Td>
-                          <div className="flex items-center gap-2">
-                            <Package size={13} className="text-muted-foreground" />
-                            <span
-                              className="text-sm text-foreground"
+                          </div>
+                          {d.pedidoCodigo && (
+                            <div
+                              className="mt-0.5 text-[10px] text-muted-foreground truncate"
                               style={{ fontFamily: "'JetBrains Mono', monospace" }}
                             >
-                              {d.pedidoCodigo ?? '—'}
-                            </span>
+                              Pedido: {d.pedidoCodigo} · {d.itemsCount}{' '}
+                              {d.itemsCount === 1 ? 'item' : 'ítems'}
+                            </div>
+                          )}
+                          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                            <EstadoBadge estado={d.estadoNombre} />
+                            <ProgresoBar d={d} />
                           </div>
-                          <div
-                            className="text-[10px] text-muted-foreground"
-                            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                          >
-                            {d.itemsCount} {d.itemsCount === 1 ? 'item' : 'ítems'}
-                          </div>
-                        </Td>
-                        <Td>
-                          <span className="text-sm text-foreground">
-                            {d.operadorNombre ?? '—'}
-                          </span>
-                        </Td>
-                        <Td>
-                          <ProgresoBar d={d} />
-                        </Td>
-                        <Td>
-                          <EstadoBadge estado={d.estadoNombre} />
-                        </Td>
-                        <Td>
-                          <span
-                            className="text-xs text-muted-foreground"
-                            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                          >
-                            {d.createdAtLabel}
-                          </span>
-                        </Td>
-                        <Td>
-                          <div
-                            className="flex justify-end"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <AccionDevolucion
-                              devolucion={d}
-                              puedeRecibir={puedeRecibir}
-                              onVer={() => setDetalle(d)}
-                            />
-                          </div>
-                        </Td>
+                        </div>
+                        <ChevronRight size={18} className="text-muted-foreground shrink-0" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* DESKTOP: tabla completa intacta */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead>
+                      <tr
+                        className="border-b border-border bg-muted/30"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        <Th>Código</Th>
+                        <Th>Pedido</Th>
+                        <Th>Operador</Th>
+                        <Th>Progreso</Th>
+                        <Th>Estado</Th>
+                        <Th>Enviada</Th>
+                        <Th className="text-right">Acción</Th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filtradas.map((d) => (
+                        <tr
+                          key={d.id}
+                          onClick={() => setDetalle(d)}
+                          className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                        >
+                          <Td>
+                            <span
+                              className="text-primary"
+                              style={{
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontWeight: 500,
+                              }}
+                            >
+                              {d.codigo}
+                            </span>
+                          </Td>
+                          <Td>
+                            <div className="flex items-center gap-2">
+                              <Package size={13} className="text-muted-foreground" />
+                              <span
+                                className="text-sm text-foreground"
+                                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                              >
+                                {d.pedidoCodigo ?? '—'}
+                              </span>
+                            </div>
+                            <div
+                              className="text-[10px] text-muted-foreground"
+                              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                            >
+                              {d.itemsCount} {d.itemsCount === 1 ? 'item' : 'ítems'}
+                            </div>
+                          </Td>
+                          <Td>
+                            <span className="text-sm text-foreground">
+                              {d.operadorNombre ?? '—'}
+                            </span>
+                          </Td>
+                          <Td>
+                            <ProgresoBar d={d} />
+                          </Td>
+                          <Td>
+                            <EstadoBadge estado={d.estadoNombre} />
+                          </Td>
+                          <Td>
+                            <span
+                              className="text-xs text-muted-foreground"
+                              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                            >
+                              {d.createdAtLabel}
+                            </span>
+                          </Td>
+                          <Td>
+                            <div
+                              className="flex justify-end"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <AccionDevolucion
+                                devolucion={d}
+                                puedeRecibir={puedeRecibir}
+                                onVer={() => setDetalle(d)}
+                              />
+                            </div>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
             <Pagination
               page={page}
@@ -671,7 +714,7 @@ function ProgresoBar({ d }: { d: DevolucionListItem }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className="w-24 h-1.5 bg-muted overflow-hidden"
+        className="w-16 sm:w-24 h-1.5 bg-muted overflow-hidden"
         style={{ borderRadius: '0.15rem' }}
       >
         <div

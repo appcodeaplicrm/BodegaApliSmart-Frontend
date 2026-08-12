@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
   ChevronDown,
+  ChevronRight,
   Edit3,
   ArrowUpFromLine,
   MoreHorizontal,
@@ -28,6 +29,7 @@ import { ProductoDetalleModal } from './ProductoDetalleModal'
 import { ModalCrearKit } from './ModalCrearKit'
 import { Pagination } from './Pagination'
 import { PageHeader } from './PageHeader'
+import { SelectMobile } from './SelectMobile'
 import { imageUrl } from '../lib/apiBase'
 import { useProductos, productosStore, type ProductoListItem } from '../store/productos'
 import { useKits, kitsStore, type Kit } from '../store/kits'
@@ -223,15 +225,17 @@ export function InventarioV2() {
         subtitle="STOCKPRO · PANEL CENTRAL"
       />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
       {/* ═══════════════════════════════════════════════════════════
           TABLA KITS
           ═══════════════════════════════════════════════════════════ */}
       <section>
-        {/* Section header */}
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2.5">
-            <Layers size={15} className="text-primary" />
+        {/* Section header
+            Mobile: 2 filas (título / controles). El search ocupa full-width
+            y el botón "Nuevo kit" baja a su propia fila. */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Layers size={15} className="text-primary shrink-0" />
             <h2
               className="text-lg uppercase text-foreground leading-none"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
@@ -248,23 +252,23 @@ export function InventarioV2() {
               {kits.length} kits
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-initial">
               <Search
                 size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
               />
               <input
                 type="text"
                 placeholder="Buscar kit…"
-                className="pl-8 pr-3 py-1.5 bg-muted border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 w-56"
+                className="w-full sm:w-56 pl-8 pr-3 py-1.5 min-h-[36px] bg-muted border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60"
                 style={{ borderRadius: '0.25rem' }}
               />
             </div>
             {puedeCrearKits && (
               <button
                 onClick={() => setOpenKit(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shrink-0"
                 style={{ borderRadius: '0.25rem' }}
               >
                 <Plus size={13} />
@@ -304,10 +308,12 @@ export function InventarioV2() {
           TABLA PRODUCTOS
           ═══════════════════════════════════════════════════════════ */}
       <section>
-        {/* Section header */}
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <div className="flex items-center gap-2.5">
-            <TagIcon size={15} className="text-secondary" />
+        {/* Section header
+            Mobile: 2 filas. Fila 1: título. Fila 2: grilla 2-col con
+            search + 2 selects + botón "Nuevo producto" full-width. */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <TagIcon size={15} className="text-secondary shrink-0" />
             <h2
               className="text-lg uppercase text-foreground leading-none"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
@@ -324,53 +330,45 @@ export function InventarioV2() {
               {total} resultados
             </span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto] gap-2 w-full sm:w-auto sm:items-center">
             {/* Búsqueda por SKU o nombre */}
-            <div className="relative">
+            <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
               <Search
                 size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
               />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="SKU o producto…"
-                className="pl-8 pr-3 py-1.5 bg-muted border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 w-56"
+                className="w-full pl-8 pr-3 py-1.5 min-h-[36px] bg-muted border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60"
                 style={{ borderRadius: '0.25rem' }}
               />
             </div>
             {/* Filtro categoría */}
-            <select
+            <SelectMobile
               value={catFilter}
-              onChange={(e) => setCatFilter(e.target.value)}
-              className="px-3 py-1.5 bg-muted border border-border text-xs text-foreground outline-none focus:border-primary/60"
-              style={{ borderRadius: '0.25rem' }}
-            >
-              {categorias.map((c) => (
-                <option key={c} value={c}>
-                  Categoría: {c}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setCatFilter(v)}
+              options={categorias}
+              prefix="Categoría: "
+              placeholder="Seleccionar…"
+              label="Filtrar por categoría"
+              aria-label="Categoría"
+            />
             {/* Filtro estado */}
-            <select
+            <SelectMobile
               value={estadoFilter}
-              onChange={(e) =>
-                setEstadoFilter(e.target.value as 'Todos' | EstadoProducto)
-              }
-              className="px-3 py-1.5 bg-muted border border-border text-xs text-foreground outline-none focus:border-primary/60"
-              style={{ borderRadius: '0.25rem' }}
-            >
-              <option value="Todos">Estado: Todos</option>
-              <option value="ok">Estado: OK</option>
-              <option value="bajo">Estado: Bajo</option>
-              <option value="agotado">Estado: Agotado</option>
-            </select>
+              onChange={(v) => setEstadoFilter(v as 'Todos' | EstadoProducto)}
+              options={['Todos', 'ok', 'bajo', 'agotado']}
+              prefix="Estado: "
+              label="Filtrar por estado"
+              aria-label="Estado"
+            />
             {puedeCrearProductos && (
               <button
                 onClick={() => setOpenNuevo(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shrink-0"
                 style={{ borderRadius: '0.25rem' }}
               >
                 <Plus size={13} />
@@ -394,9 +392,11 @@ export function InventarioV2() {
             className="border border-border bg-card overflow-hidden"
             style={{ borderRadius: '0.25rem' }}
           >
-            {/* Header de columnas */}
+            {/* Header de columnas — SOLO desktop (sm+). En mobile la
+                fila tiene su layout propio sin header (es self-evident
+                por el tap que abre el detalle). */}
             <div
-              className="grid items-center px-5 py-3 bg-muted/40 border-b border-border text-[10px] text-muted-foreground uppercase tracking-widest"
+              className="hidden sm:grid items-center px-5 py-3 bg-muted/40 border-b border-border text-[10px] text-muted-foreground uppercase tracking-widest"
               style={{
                 gridTemplateColumns:
                   '40px 95px 1.4fr 0.9fr 90px 60px 70px 95px 90px 32px',
@@ -429,164 +429,46 @@ export function InventarioV2() {
                     : 100,
                 )
                 return (
-                  <div
+                  <ProductoFila
                     key={p.id}
-                    className="grid items-center px-5 py-3 hover:bg-muted/30 transition-colors text-xs"
-                    style={{
-                      gridTemplateColumns:
-                        '40px 105px 1fr 1.2fr 90px 60px 70px 95px 90px 32px',
-                      gap: '16px',
+                    p={p}
+                    stock={stock}
+                    estado={estado}
+                    c={c}
+                    stockPct={stockPct}
+                    onDetalle={() => setProductoDetalle(p)}
+                    menuOpen={prodMenu === p.id}
+                    onMenuToggle={() =>
+                      setProdMenu(prodMenu === p.id ? null : p.id)
+                    }
+                    menuRef={prodMenu === p.id ? menuRef : undefined}
+                    onMenuEdit={() => {
+                      setProductoDetalle(p)
+                      setProdMenu(null)
                     }}
-                  >
-                    {/* Foto (miniatura 32x32, sin header) */}
-                    {imageUrl(p.fotoUrl) ? (
-                      <img
-                        src={imageUrl(p.fotoUrl) ?? ''}
-                        alt={p.nombre}
-                        className="w-8 h-8 object-cover border border-border"
-                        style={{ borderRadius: '0.25rem' }}
-                      />
-                    ) : (
-                      <div
-                        className="w-8 h-8 bg-muted border border-border flex items-center justify-center"
-                        style={{ borderRadius: '0.25rem' }}
-                      >
-                        <Boxes
-                          size={12}
-                          className="text-muted-foreground"
-                        />
-                      </div>
-                    )}
-                    {/* SKU */}
-                    <span className="text-muted-foreground truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {p.codigo}
-                    </span>
-                    {/* Producto */}
-                    <button
-                      onClick={() => setProductoDetalle(p)}
-                      className="text-foreground font-medium text-left hover:text-primary transition-colors truncate"
-                    >
-                      {p.nombre}
-                    </button>
-                    {/* Categoría */}
-                    <span
-                      className="inline-flex items-center text-xs text-foreground border border-border px-2 py-0.5 w-fit truncate"
-                      style={{ borderRadius: '0.25rem' }}
-                      title={p.categoria.nombre}
-                    >
-                      {p.categoria.nombre}
-                    </span>
-                    {/* Stock + mini barra */}
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${c.text}`}>
-                        {stock}
-                      </span>
-                      <div className="w-10 h-1 rounded-full bg-muted overflow-hidden shrink-0">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${stockPct}%`, background: c.bar }}
-                        />
-                      </div>
-                    </div>
-                    {/* Mínimo */}
-                    <span className="text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {p.stockMinimo}
-                    </span>
-                    {/* Unidad */}
-                    <span className="text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {p.unidadMedida.abreviatura}
-                    </span>
-                    {/* Precio */}
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {formatPesos(p.precio)}
-                    </span>
-                    {/* Estado */}
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
-                      <span
-                        className={c.text}
-                        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px' }}
-                      >
-                        {estado === 'ok' ? 'OK' : estado === 'bajo' ? 'Bajo' : 'Agotado'}
-                      </span>
-                    </span>
-                    {/* Acciones */}
-                    <div className="relative flex justify-end" ref={prodMenu === p.id ? menuRef : undefined}>
-                      <button
-                        onClick={() =>
-                          setProdMenu(prodMenu === p.id ? null : p.id)
-                        }
-                        className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                        style={{ borderRadius: '0.25rem' }}
-                        title="Más opciones"
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
-                      {prodMenu === p.id && (
-                        <div
-                          className="absolute right-0 top-9 z-50 bg-card border border-border shadow-xl py-1 w-40"
-                          style={{ borderRadius: '0.25rem' }}
-                        >
-                          {puedeEditarProductos && (
-                            <button
-                              onClick={() => {
-                                setProductoDetalle(p)
-                                setProdMenu(null)
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
-                            >
-                              <Edit3 size={12} className="text-muted-foreground" />
-                              Editar
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              alert('Registrar entrada (pendiente de wiring)')
-                              setProdMenu(null)
-                            }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
-                          >
-                            <ChevronUp size={12} className="text-muted-foreground" />
-                            Registrar entrada
-                          </button>
-                          <button
-                            onClick={() => {
-                              alert('Registrar salida (pendiente de wiring)')
-                              setProdMenu(null)
-                            }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
-                          >
-                            <ChevronDown size={12} className="text-muted-foreground" />
-                            Registrar salida
-                          </button>
-                          {puedeEliminarProductos && (
-                            <button
-                              onClick={() => {
-                                if (confirm(`¿Eliminar "${p.nombre}"?`)) {
-                                  void productosStore.eliminar(p.id).then(() => cargar())
-                                }
-                                setProdMenu(null)
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-primary/10 transition-colors"
-                            >
-                              <X size={12} className="text-primary" />
-                              Eliminar
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    onMenuDelete={() => {
+                      if (confirm(`¿Eliminar "${p.nombre}"?`)) {
+                        void productosStore.eliminar(p.id).then(() => cargar())
+                      }
+                      setProdMenu(null)
+                    }}
+                    puedeEditar={puedeEditarProductos}
+                    puedeEliminar={puedeEliminarProductos}
+                    formatPesos={formatPesos}
+                  />
                 )
               })}
             </div>
 
-            {/* Footer: contador | paginación centrada | resumen */}
+            {/* Footer: 3 filas en mobile, 3 columnas en desktop.
+                Fila 1: "Mostrando X-Y de Z" (full-width, alineado izquierda).
+                Fila 2: paginación centrada (full-width).
+                Fila 3: chips de resumen (wrap). */}
             <div
-              className="grid grid-cols-3 items-center gap-3 px-5 py-3 bg-muted/30 border-t border-border text-xs text-muted-foreground"
+              className="flex flex-col gap-2 sm:grid sm:grid-cols-3 sm:items-center sm:gap-3 px-4 sm:px-5 py-3 bg-muted/30 border-t border-border text-xs text-muted-foreground"
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-              {/* Contador a la izquierda */}
+              {/* Contador (fila 1 en mobile, izq en desktop) */}
               <span>
                 {(() => {
                   if (total === 0) return 'Sin resultados'
@@ -595,8 +477,9 @@ export function InventarioV2() {
                   return `Mostrando ${desde}-${hasta} de ${total}`
                 })()}
               </span>
-              {/* Paginación centrada (sin "Mostrando" ni border-top propios, ya los muestra el footer) */}
-              <div className="flex justify-center">
+
+              {/* Paginación centrada (fila 2 en mobile, centro en desktop) */}
+              <div className="flex justify-center sm:justify-center">
                 {total > 0 && (
                   <Pagination
                     page={page}
@@ -609,15 +492,16 @@ export function InventarioV2() {
                   />
                 )}
               </div>
-              {/* Resumen a la derecha */}
-              <div className="flex items-center justify-end gap-3">
+
+              {/* Chips de resumen (fila 3 en mobile wrap, derecha en desktop) */}
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 sm:justify-end">
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
                   {resumenEstados.ok} OK
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                  {resumenEstados.bajo} Bajo mínimo
+                  {resumenEstados.bajo} Bajo
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -635,7 +519,10 @@ export function InventarioV2() {
         <NuevoProductoModal
           bodegaId={activaId}
           onClose={() => setOpenNuevo(false)}
-          onCreated={() => cargar()}
+          onCreated={() => {
+            setOpenNuevo(false)
+            cargar()
+          }}
         />
       )}
       {openKit && activaId && (
@@ -648,6 +535,265 @@ export function InventarioV2() {
         />
       )}
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════
+// Subcomponente: ProductoFila
+// Layout responsive:
+//  - mobile (<sm): 4 columnas (Producto | Stock | Precio | Estado) + chevron.
+//    Toda la fila es tocable → abre ProductoDetalleModal.
+//  - desktop (sm+): grilla completa de 10 cols con menú de acciones.
+// ═══════════════════════════════════════════════════════════
+
+type EstadoColor = ReturnType<typeof colorDeEstado>
+
+function ProductoFila({
+  p,
+  stock,
+  estado,
+  c,
+  stockPct,
+  onDetalle,
+  menuOpen,
+  onMenuToggle,
+  menuRef,
+  onMenuEdit,
+  onMenuDelete,
+  puedeEditar,
+  puedeEliminar,
+  formatPesos,
+}: {
+  p: ProductoListItem
+  stock: number
+  estado: EstadoProducto
+  c: EstadoColor
+  stockPct: number
+  onDetalle: () => void
+  menuOpen: boolean
+  onMenuToggle: () => void
+  menuRef: React.RefObject<HTMLDivElement> | undefined
+  onMenuEdit: () => void
+  onMenuDelete: () => void
+  puedeEditar: boolean
+  puedeEliminar: boolean
+  formatPesos: (n: number) => string
+}) {
+  return (
+    <>
+      {/* ─── MOBILE: 4 columnas + chevron, toda la fila es el trigger ─── */}
+      <button
+        type="button"
+        onClick={onDetalle}
+        className="sm:hidden w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-muted/30 active:bg-muted/50 transition-colors min-h-[64px]"
+      >
+        {/* Foto miniatura */}
+        {imageUrl(p.fotoUrl) ? (
+          <img
+            src={imageUrl(p.fotoUrl) ?? ''}
+            alt={p.nombre}
+            className="w-10 h-10 object-cover border border-border shrink-0"
+            style={{ borderRadius: '0.25rem' }}
+          />
+        ) : (
+          <div
+            className="w-10 h-10 bg-muted border border-border flex items-center justify-center shrink-0"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <Boxes size={14} className="text-muted-foreground" />
+          </div>
+        )}
+
+        {/* Producto (flex-1) */}
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-foreground truncate">
+            {p.nombre}
+          </div>
+          <div
+            className="text-[10px] text-muted-foreground mt-0.5 truncate"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            {p.codigo} · {p.categoria.nombre}
+          </div>
+        </div>
+
+        {/* Stock + Precio (col derecha, 2 líneas) */}
+        <div className="text-right shrink-0">
+          <div
+            className="text-sm font-semibold"
+            style={{ fontFamily: "'JetBrains Mono', monospace", color: c.text }}
+          >
+            {stock}
+          </div>
+          <div
+            className="text-[10px] text-muted-foreground"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            {formatPesos(p.precio)}
+          </div>
+        </div>
+
+        {/* Estado pill */}
+        <span className="shrink-0 flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+          <span
+            className={c.text}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px' }}
+          >
+            {estado === 'ok' ? 'OK' : estado === 'bajo' ? 'BAJO' : 'AGOT.'}
+          </span>
+        </span>
+
+        <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+      </button>
+
+      {/* ─── DESKTOP: grilla completa con menú de acciones ─── */}
+      <div
+        className="hidden sm:grid items-center px-5 py-3 hover:bg-muted/30 transition-colors text-xs"
+        style={{
+          gridTemplateColumns:
+            '40px 105px 1fr 1.2fr 90px 60px 70px 95px 90px 32px',
+          gap: '16px',
+        }}
+      >
+        {/* Foto (miniatura 32x32, sin header) */}
+        {imageUrl(p.fotoUrl) ? (
+          <img
+            src={imageUrl(p.fotoUrl) ?? ''}
+            alt={p.nombre}
+            className="w-8 h-8 object-cover border border-border"
+            style={{ borderRadius: '0.25rem' }}
+          />
+        ) : (
+          <div
+            className="w-8 h-8 bg-muted border border-border flex items-center justify-center"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <Boxes size={12} className="text-muted-foreground" />
+          </div>
+        )}
+        {/* SKU */}
+        <span
+          className="text-muted-foreground truncate"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {p.codigo}
+        </span>
+        {/* Producto */}
+        <button
+          onClick={onDetalle}
+          className="text-foreground font-medium text-left hover:text-primary transition-colors truncate"
+        >
+          {p.nombre}
+        </button>
+        {/* Categoría */}
+        <span
+          className="inline-flex items-center text-xs text-foreground border border-border px-2 py-0.5 w-fit truncate"
+          style={{ borderRadius: '0.25rem' }}
+          title={p.categoria.nombre}
+        >
+          {p.categoria.nombre}
+        </span>
+        {/* Stock + mini barra */}
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium ${c.text}`}>{stock}</span>
+          <div className="w-10 h-1 rounded-full bg-muted overflow-hidden shrink-0">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{ width: `${stockPct}%`, background: c.bar }}
+            />
+          </div>
+        </div>
+        {/* Mínimo */}
+        <span
+          className="text-muted-foreground"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {p.stockMinimo}
+        </span>
+        {/* Unidad */}
+        <span
+          className="text-muted-foreground"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {p.unidadMedida.abreviatura}
+        </span>
+        {/* Precio */}
+        <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {formatPesos(p.precio)}
+        </span>
+        {/* Estado */}
+        <span className="flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
+          <span
+            className={c.text}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px' }}
+          >
+            {estado === 'ok' ? 'OK' : estado === 'bajo' ? 'Bajo' : 'Agotado'}
+          </span>
+        </span>
+        {/* Acciones */}
+        <div className="relative flex justify-end" ref={menuRef}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onMenuToggle()
+            }}
+            className="p-2 min-w-[32px] min-h-[32px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center"
+            style={{ borderRadius: '0.25rem' }}
+            title="Más opciones"
+            aria-label="Más opciones"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-9 z-50 bg-card border border-border shadow-xl py-1 w-40"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              {puedeEditar && (
+                <button
+                  onClick={onMenuEdit}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
+                >
+                  <Edit3 size={12} className="text-muted-foreground" />
+                  Editar
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  alert('Registrar entrada (pendiente de wiring)')
+                  onMenuToggle()
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
+              >
+                <ChevronUp size={12} className="text-muted-foreground" />
+                Registrar entrada
+              </button>
+              <button
+                onClick={() => {
+                  alert('Registrar salida (pendiente de wiring)')
+                  onMenuToggle()
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
+              >
+                <ChevronDown size={12} className="text-muted-foreground" />
+                Registrar salida
+              </button>
+              {puedeEliminar && (
+                <button
+                  onClick={onMenuDelete}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <X size={12} className="text-primary" />
+                  Eliminar
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   )
 }
 

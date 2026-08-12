@@ -26,11 +26,13 @@ import {
   type ModuloDef,
   type SubmoduloDef,
   type Permiso,
+  type Accion,
   type Rol,
 } from '../store/permisos'
 import { authStore } from '../store/auth'
 import { api } from '../lib/api'
 import { PageHeader } from './PageHeader'
+import { Modal } from './Modal'
 
 type CatalogoPermiso = { key: string; modulo: string; accion: string }
 
@@ -91,7 +93,7 @@ export function Roles() {
             onClick={() => setCreating(true)}
             disabled={catalogoCargando}
             title={catalogoCargando ? 'Cargando permisos disponibles del plan…' : 'Crear un nuevo rol'}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-wait"
+            className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-wait"
             style={{ borderRadius: '0.25rem' }}
           >
             <Plus size={13} />
@@ -100,7 +102,7 @@ export function Roles() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="relative">
           <Search
             size={15}
@@ -115,6 +117,19 @@ export function Roles() {
             style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
           />
         </div>
+
+        {/* Botón "Nuevo Rol" mobile: debajo del buscador.
+            En desktop el header ya tiene su botón, así que lo ocultamos. */}
+        <button
+          onClick={() => setCreating(true)}
+          disabled={catalogoCargando}
+          title={catalogoCargando ? 'Cargando permisos disponibles del plan…' : 'Crear un nuevo rol'}
+          className="lg:hidden w-full inline-flex items-center justify-center gap-1.5 min-h-11 bg-primary text-primary-foreground text-sm font-semibold active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-wait"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <Plus size={15} />
+          Nuevo Rol
+        </button>
 
         {/* ESTADOS DE CARGA / ERROR */}
         {estadoStore.status === 'cargando' && roles.length === 0 && (
@@ -233,46 +248,26 @@ export function Roles() {
       )}
 
       {confirmDelete && (
-        <div
-          className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => !deleting && setConfirmDelete(null)}
-        >
-          <div
-            className="bg-card border border-border w-full max-w-sm"
-            style={{ borderRadius: '0.25rem' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 bg-primary/15 flex items-center justify-center">
-                  <Trash2 size={15} className="text-primary" />
-                </div>
-                <h3
-                  className="text-lg uppercase text-foreground"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
-                >
-                  Eliminar rol
-                </h3>
-              </div>
-              <p
-                className="text-sm text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                ¿Eliminar el rol{' '}
-                <span className="text-foreground font-medium">{confirmDelete.nombre}</span>?
-                Los usuarios asignados a este rol pasarán automáticamente a Operador.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 p-4 border-t border-border">
+        <Modal
+          open
+          onClose={() => !deleting && setConfirmDelete(null)}
+          title="Eliminar rol"
+          description={confirmDelete.nombre}
+          icon={<Trash2 size={16} className="text-primary" />}
+          size="sm"
+          footer={
+            <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setConfirmDelete(null)}
                 disabled={deleting}
-                className="flex-1 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+                className="flex-1 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
                 style={{ borderRadius: '0.25rem' }}
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={async () => {
                   const rolEliminadoKey = confirmDelete.key
                   setDeleting(true)
@@ -293,7 +288,7 @@ export function Roles() {
                   }
                 }}
                 disabled={deleting}
-                className="flex-1 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                className="flex-1 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
                 style={{ borderRadius: '0.25rem' }}
               >
                 {deleting ? (
@@ -309,8 +304,19 @@ export function Roles() {
                 )}
               </button>
             </div>
+          }
+        >
+          <div className="p-5">
+            <p
+              className="text-sm text-muted-foreground"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              ¿Eliminar el rol{' '}
+              <span className="text-foreground font-medium">{confirmDelete.nombre}</span>?
+              Los usuarios asignados a este rol pasarán automáticamente a Operador.
+            </p>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -451,69 +457,356 @@ function MatrizPermisos({
       className="bg-muted/30 border border-border overflow-hidden"
       style={{ borderRadius: '0.25rem' }}
     >
-      <table className="w-full">
-        <thead>
-          <tr
-            className="border-b border-border bg-card"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-          >
-            <th className="text-left px-3 py-2.5 text-[10px] text-muted-foreground tracking-widest uppercase font-normal">
-              Módulo / Sub-módulo
-            </th>
-            {ACCIONES.map((a) => (
-              <th
-                key={a}
-                className="text-center px-3 py-2.5 text-[10px] text-muted-foreground tracking-widest uppercase font-normal"
-              >
-                {ACCION_LABELS[a]}
+      {/* DESKTOP: tabla con todas las columnas */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr
+              className="border-b border-border bg-card"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              <th className="text-left px-3 py-2.5 text-[10px] text-muted-foreground tracking-widest uppercase font-normal">
+                Módulo / Sub-módulo
               </th>
-            ))}
-            <th className="text-center px-3 py-2.5 text-[10px] text-muted-foreground tracking-widest uppercase font-normal w-16">
-              todo
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {modulosVisibles.map((m) => {
-            const subs = m.submodulos ?? []
-            if (subs.length === 0) {
+              {ACCIONES.map((a) => (
+                <th
+                  key={a}
+                  className="text-center px-3 py-2.5 text-[10px] text-muted-foreground tracking-widest uppercase font-normal"
+                >
+                  {ACCION_LABELS[a]}
+                </th>
+              ))}
+              <th className="text-center px-3 py-2.5 text-[10px] text-muted-foreground tracking-widest uppercase font-normal w-16">
+                todo
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {modulosVisibles.map((m) => {
+              const subs = m.submodulos ?? []
+              if (subs.length === 0) {
+                return (
+                  <ModuloFila
+                    key={m.key}
+                    modulo={m}
+                    selected={selected}
+                    onToggle={onToggle}
+                    permisosDisponibles={permisosDisponibles}
+                  />
+                )
+              }
+              const isOpen = expanded.has(m.key)
+              const subKeys = subs
+                .flatMap((s) => keysSubmodulo(m.key, s.key))
+                .filter((k) => permisosDisponibles.has(k))
+              const subOn = subKeys.filter((k) => selected.has(k)).length
               return (
-                <ModuloFila
+                <ModuloPadreGrupo
                   key={m.key}
                   modulo={m}
+                  isOpen={isOpen}
+                  onToggleExpand={() => toggleExpand(m.key)}
+                  submodulos={subs}
                   selected={selected}
-                  onToggle={onToggle}
+                  onToggleSub={onToggle}
+                  onToggleTodoGrupo={() => {
+                    const allOn = subOn === subKeys.length
+                    for (const k of subKeys) {
+                      if (allOn && selected.has(k)) onToggle(k)
+                      if (!allOn && !selected.has(k)) onToggle(k)
+                    }
+                  }}
+                  subOn={subOn}
+                  subTotal={subKeys.length}
                   permisosDisponibles={permisosDisponibles}
                 />
               )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* MOBILE: lista de acordeones, uno por módulo. Si tiene submódulos
+          se expande y muestra cada uno con sus 5 acciones (Ver/Crear/
+          Editar/Eliminar/Todo) en grilla 3+2. Sin submódulos → se ve la
+          fila de acciones directa al expandir. */}
+      <ul className="md:hidden divide-y divide-border">
+        {modulosVisibles.map((m) => {
+          const subs = m.submodulos ?? []
+          const isOpen = expanded.has(m.key)
+          const accionesDisponibles = m.acciones.filter((a) =>
+            permisosDisponibles.has(`${m.key}.${a}`),
+          )
+          const allOn =
+            accionesDisponibles.length > 0 &&
+            accionesDisponibles.every((a) => selected.has(`${m.key}.${a}`))
+          const someOn = accionesDisponibles.some((a) =>
+            selected.has(`${m.key}.${a}`),
+          )
+          function toggleTodoModulo() {
+            if (allOn) {
+              for (const a of accionesDisponibles) {
+                if (selected.has(`${m.key}.${a}`)) onToggle(`${m.key}.${a}`)
+              }
+            } else {
+              for (const a of accionesDisponibles) {
+                if (!selected.has(`${m.key}.${a}`)) onToggle(`${m.key}.${a}`)
+              }
             }
-            const isOpen = expanded.has(m.key)
-            const subKeys = subs.flatMap((s) => keysSubmodulo(m.key, s.key)).filter((k) => permisosDisponibles.has(k))
-            const subOn = subKeys.filter((k) => selected.has(k)).length
-            return (
-              <ModuloPadreGrupo
-                key={m.key}
-                modulo={m}
-                isOpen={isOpen}
-                onToggleExpand={() => toggleExpand(m.key)}
-                submodulos={subs}
-                selected={selected}
-                onToggleSub={onToggle}
-                onToggleTodoGrupo={() => {
-                  const allOn = subOn === subKeys.length
-                  for (const k of subKeys) {
-                    if (allOn && selected.has(k)) onToggle(k)
-                    if (!allOn && !selected.has(k)) onToggle(k)
-                  }
-                }}
-                subOn={subOn}
-                subTotal={subKeys.length}
-                permisosDisponibles={permisosDisponibles}
-              />
-            )
-          })}
-        </tbody>
-      </table>
+          }
+          return (
+            <li key={m.key}>
+              <button
+                type="button"
+                onClick={() => toggleExpand(m.key)}
+                className="w-full text-left p-3 flex items-center gap-3 hover:bg-muted/30 active:bg-muted/50 transition-colors"
+                aria-expanded={isOpen}
+              >
+                <ChevronRight
+                  size={14}
+                  className={`text-muted-foreground shrink-0 transition-transform ${
+                    isOpen ? 'rotate-90' : ''
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="text-sm text-foreground"
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {m.label}
+                  </div>
+                  {subs.length > 0 ? (
+                    <div
+                      className="text-[10px] text-muted-foreground mt-0.5"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {subs.length} sub-módulos
+                    </div>
+                  ) : (
+                    <div
+                      className="text-[10px] text-muted-foreground mt-0.5"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {accionesDisponibles.length} acciones
+                    </div>
+                  )}
+                </div>
+                {subs.length === 0 && (
+                  <span
+                    className={`shrink-0 w-2 h-2 rounded-full ${
+                      allOn
+                        ? 'bg-secondary'
+                        : someOn
+                          ? 'bg-primary'
+                          : 'bg-muted-foreground/30'
+                    }`}
+                    title={
+                      allOn
+                        ? 'Todas las acciones activas'
+                        : someOn
+                          ? 'Algunas acciones activas'
+                          : 'Sin acciones activas'
+                    }
+                  />
+                )}
+              </button>
+
+              {isOpen && (
+                <div className="px-3 pb-3 space-y-3 bg-background/40">
+                  {subs.length === 0 ? (
+                    <div className="pt-2">
+                      <ModuloAccionesGrid
+                        moduloKey={m.key}
+                        acciones={accionesDisponibles}
+                        selected={selected}
+                        onToggle={onToggle}
+                        allOn={allOn}
+                        someOn={someOn}
+                        onToggleTodo={toggleTodoModulo}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      {subs
+                        .filter((s) =>
+                          // El sub-módulo se muestra si al menos una de
+                          // sus acciones (modulo.sub.accion) está
+                          // disponible en el catálogo del plan.
+                          keysSubmodulo(m.key, s.key).some((k) =>
+                            permisosDisponibles.has(k),
+                          ),
+                        )
+                        .map((s) => {
+                          const subKeys = keysSubmodulo(m.key, s.key).filter(
+                            (k) => permisosDisponibles.has(k),
+                          )
+                          const subAllOn =
+                            subKeys.length > 0 &&
+                            subKeys.every((k) => selected.has(k))
+                          const subSomeOn = subKeys.some((k) => selected.has(k))
+                          return (
+                            <SubmoduloAcciones
+                              key={s.key}
+                              moduloKey={m.key}
+                              sub={s}
+                              subKeys={subKeys}
+                              selected={selected}
+                              onToggle={onToggle}
+                              allOn={subAllOn}
+                              someOn={subSomeOn}
+                            />
+                          )
+                        })}
+                    </>
+                  )}
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+// ─── Helpers mobile: grilla de acciones por sub-módulo ──────────────
+
+function ModuloAccionesGrid({
+  moduloKey,
+  acciones,
+  selected,
+  onToggle,
+  allOn,
+  someOn,
+  onToggleTodo,
+}: {
+  moduloKey: string
+  acciones: string[]
+  selected: Set<Permiso>
+  onToggle: (p: Permiso) => void
+  allOn: boolean
+  someOn: boolean
+  onToggleTodo: () => void
+}) {
+  return (
+    <div className="pt-1">
+      <div className="grid grid-cols-3 gap-2">
+        {acciones.map((a) => {
+          const p = `${moduloKey}.${a}` as Permiso
+          const has = selected.has(p)
+          return (
+            <button
+              key={a}
+              type="button"
+              onClick={() => onToggle(p)}
+              className={`min-h-11 px-2 py-2 border text-xs transition-colors ${
+                has
+                  ? 'border-secondary/50 bg-secondary/15 text-secondary'
+                  : 'border-border text-muted-foreground hover:border-foreground/30'
+              }`}
+              style={{ borderRadius: '0.25rem' }}
+            >
+              {has && <Check size={12} className="inline mr-1 -mt-0.5" />}
+              {ACCION_LABELS[a]}
+            </button>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onToggleTodo}
+        className={`mt-2 w-full min-h-11 px-2 py-2 border text-xs transition-colors ${
+          allOn
+            ? 'border-secondary/50 bg-secondary/15 text-secondary'
+            : someOn
+              ? 'border-primary/50 bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:border-foreground/30'
+        }`}
+        style={{ borderRadius: '0.25rem' }}
+      >
+        {allOn && <Check size={12} className="inline mr-1 -mt-0.5" />}
+        Todo el módulo
+      </button>
+    </div>
+  )
+}
+
+function SubmoduloAcciones({
+  moduloKey,
+  sub,
+  subKeys,
+  selected,
+  onToggle,
+  allOn,
+  someOn,
+}: {
+  moduloKey: string
+  sub: { key: string; label: string }
+  subKeys: string[]
+  selected: Set<Permiso>
+  onToggle: (p: Permiso) => void
+  allOn: boolean
+  someOn: boolean
+}) {
+  function toggleTodoSub() {
+    if (allOn) {
+      for (const k of subKeys) {
+        if (selected.has(k as Permiso)) onToggle(k as Permiso)
+      }
+    } else {
+      for (const k of subKeys) {
+        if (!selected.has(k as Permiso)) onToggle(k as Permiso)
+      }
+    }
+  }
+  return (
+    <div className="pt-2">
+      <div
+        className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        {sub.label}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {subKeys.map((k) => {
+          const accion = k.split('.').pop() ?? ''
+          const has = selected.has(k as Permiso)
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => onToggle(k as Permiso)}
+              className={`min-h-11 px-2 py-2 border text-xs transition-colors ${
+                has
+                  ? 'border-secondary/50 bg-secondary/15 text-secondary'
+                  : 'border-border text-muted-foreground hover:border-foreground/30'
+              }`}
+              style={{ borderRadius: '0.25rem' }}
+            >
+              {has && <Check size={12} className="inline mr-1 -mt-0.5" />}
+              {ACCION_LABELS[accion as Accion] ?? accion}
+            </button>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={toggleTodoSub}
+        className={`mt-2 w-full min-h-11 px-2 py-2 border text-xs transition-colors ${
+          allOn
+            ? 'border-secondary/50 bg-secondary/15 text-secondary'
+            : someOn
+              ? 'border-primary/50 bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:border-foreground/30'
+        }`}
+        style={{ borderRadius: '0.25rem' }}
+      >
+        {allOn && <Check size={12} className="inline mr-1 -mt-0.5" />}
+        Todo
+      </button>
     </div>
   )
 }
@@ -799,47 +1092,49 @@ function RolEditorModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-3xl max-h-[90vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary/15 flex items-center justify-center">
-              <ShieldCheck size={18} className="text-primary" />
-            </div>
-            <div>
-              <h2
-                className="text-xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                {isNew ? 'Nuevo Rol' : `Editar permisos: ${rol!.nombre}`}
-              </h2>
-              <p
-                className="mt-1 text-xs text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                {isNew
-                  ? 'Definí nombre, descripción y los permisos del nuevo rol'
-                  : 'Modificá qué puede hacer este rol en cada módulo'}
-              </p>
-            </div>
-          </div>
+    <Modal
+      open
+      onClose={onClose}
+      title={isNew ? 'Nuevo Rol' : `Editar permisos: ${rol!.nombre}`}
+      description={isNew
+        ? 'Definí nombre, descripción y los permisos del nuevo rol'
+        : 'Modificá qué puede hacer este rol en cada módulo'}
+      icon={<ShieldCheck size={16} className="text-primary" />}
+      size="xl"
+      footer={
+        <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={onClose}
             disabled={guardando}
-            className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            className="flex-1 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+            style={{ borderRadius: '0.25rem' }}
           >
-            <X size={18} />
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={guardando}
+            className="flex-1 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            {guardando ? (
+              <>
+                <span
+                  className="w-3.5 h-3.5 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin"
+                  aria-hidden
+                />
+                Guardando…
+              </>
+            ) : (
+              isNew ? 'Crear Rol' : 'Guardar cambios'
+            )}
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      }
+    >
+      <div className="p-5 space-y-5">
           {isNew && (
             <div className="space-y-3">
               <div>
@@ -910,37 +1205,7 @@ function RolEditorModal({
               ⚠ {error}
             </p>
           )}
-        </div>
-
-        <div className="p-4 border-t border-border flex items-center gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            disabled={guardando}
-            className="flex-1 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={guardando}
-            className="flex-1 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            {guardando ? (
-              <>
-                <span
-                  className="w-3.5 h-3.5 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin"
-                  aria-hidden
-                />
-                Guardando…
-              </>
-            ) : (
-              isNew ? 'Crear Rol' : 'Guardar cambios'
-            )}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   )
 }

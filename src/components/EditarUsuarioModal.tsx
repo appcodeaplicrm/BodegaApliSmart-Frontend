@@ -18,13 +18,15 @@ import {
   keyVerPadre,
   TODAS_LAS_KEYS,
   apiGetPermisosUsuario,
-  apiReplacePermisosOverride,
   type ModuloKey,
   type ModuloDef,
   type SubmoduloDef,
   type Permiso,
 } from '../store/permisos'
 import { authStore, type ModulePermissionMap } from '../store/auth'
+import { bodegaActivaStore } from '../store/bodegaActiva'
+import { api } from '../lib/api'
+import { Modal } from './Modal'
 
 type EditarUsuarioModalProps = {
   usuario: Usuario
@@ -66,20 +68,33 @@ export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps
   const [guardando, setGuardando] = useState(false)
   const [cargando, setCargando] = useState(true)
 
-  const rolObj = roles.find((r) => r.key === rol)
-  const basePerms = useMemo(() => new Set<string>(rolObj?.permisos ?? []), [rolObj])
+  // Permisos del ROL del user EN LA BODEGA ACTIVA. Los trae el back
+  // en `r.rolPermisos` (lista plana de keys). Esto es la "línea base"
+  // contra la que se mide el override: lo que está verde por el rol,
+  // rojo por override (denegado), y los extras (verde sin ser del rol)
+  // son del override.
+  //
+  // FIX bug matriz: antes se usaba `rolObj?.permisos` del store global
+  // (los permisos del rol del ADMIN QUE EDITA, no del user a editar).
+  // Por eso la matriz mostraba los permisos del admin (todos en
+  // verde) en vez de los del user real.
+  const [basePerms, setBasePerms] = useState<Set<string>>(new Set())
 
   // Estado de la matriz (verde = true, rojo = false). Se hidrata al
-  // abrir el modal con los permisos efectivos actuales del user.
+  // abrir el modal con el ESTADO PERSISTIDO (override o rol, no
+  // efectivos). Esto permite que al guardar mandemos SOLO la diferencia
+  // y no dupliquemos el rol en el override.
   const [permisos, setPermisos] = useState<PermisoEstado>({})
-  /** Permisos que NO vienen del rol (los que vos agregaste o quitaste). */
+  /** Override original persistido en DB. `null` si no hay, `{}` si está
+   *  vacío (denegó todo), objeto si tiene keys. */
   const [overrideOriginal, setOverrideOriginal] = useState<ModulePermissionMap | null>(null)
   const [overrideDirty, setOverrideDirty] = useState(false)
 
   // Cargar el estado actual del user desde el back al abrir.
-  // Importante: la fuente de verdad para la matriz es `permisosEfectivos`
-  // (lo que el back ya calculó aplicando rol + override). Eso evita
-  // depender de que el catálogo de roles local esté cargado.
+  // Importante: la fuente de verdad para la matriz es el ESTADO
+  // PERSISTIDO (override si hay, rol si no), NO los permisos
+  // efectivos. Hidratar con efectivos causa el bug de duplicar el
+  // rol en el override al guardar.
   useEffect(() => {
     let cancelado = false
     setCargando(true)
@@ -87,31 +102,45 @@ export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps
       .then((r) => {
         if (cancelado) return
         setOverrideOriginal(r.override)
+        setBasePerms(new Set(r.rolPermisos ?? []))
 
-        // Hidratamos la matriz con la UNIÓN de:
-        //   1) permisos del rol del usuario (si los tenemos en el store)
-        //   2) permisosEfectivos que ya calculó el back (incluye override)
-        // La idea: si los roles NO están cargados todavía, arrancamos con
-        // los efectivos. Si SÍ están cargados, partimos del rol y le
-        // sumamos/cruzamos con el override. En la práctica, ambos enfoques
-        // terminan en el mismo set: los efectivos.
-        const efectivosKeys = new Set<string>()
-        for (const [mod, subs] of Object.entries(r.permisosEfectivos ?? {})) {
+        // Hidratamos la matriz con:
+        //   - Si hay override (`r.override` no es null) → usamos la
+        //     UNIÓN del override. Es la "foto" exacta persistida.
+        //   - Si NO hay override → usamos los del rol (`rolPermisos`).
+        //     Equivale a "el user tiene lo mismo que su rol".
+        //     Esto es la fuente de verdad para "lo que se va a mostrar
+        //     al guardar" y se mantiene en sync con `basePerms`.
+        const overrideKeys = new Set<string>()
+        for (const [mod, subs] of Object.entries(r.override ?? {})) {
           for (const [sub, actions] of Object.entries(subs ?? {})) {
             for (const a of actions ?? []) {
-              efectivosKeys.add(mod === sub ? `${mod}.${a}` : `${mod}.${sub}.${a}`)
+              overrideKeys.add(mod === sub ? `${mod}.${a}` : `${mod}.${sub}.${a}`)
             }
           }
         }
 
+        const rolKeys = new Set<string>(r.rolPermisos ?? [])
         const inicial: PermisoEstado = {}
         for (const k of TODAS_LAS_KEYS) {
-          // Verde si el back ya lo considera efectivo. Esto es la
-          // "foto final" que el back aplicó.
-          inicial[k] = efectivosKeys.has(k)
+          if (overrideKeys.size > 0) {
+            // Hay override → la foto es exactamente el override.
+            inicial[k] = overrideKeys.has(k)
+          } else {
+            // Sin override → la foto es el rol.
+            inicial[k] = rolKeys.has(k)
+          }
         }
         setPermisos(inicial)
         setOverrideDirty(false)
+        // Rol del user EN ESTA BODEGA (no el global). El select de
+        // rol del form debe mostrar el rol de la asignación, no el
+        // legacy `Usuario.rol`. Si el response trae el rol, lo
+        // usamos; si no (porque la bodega no tiene asignación para
+        // este user), caemos al rol global legacy como fallback.
+        if (r.rol) {
+          setRol(r.rol.key as RolUsuario)
+        }
       })
       .catch((err) => {
         if (cancelado) return
@@ -178,7 +207,11 @@ export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps
   }
 
   function resetMatriz() {
-    // Reset a "todo lo del rol verde, todo lo demás rojo"
+    // Reset a "todo lo del rol verde, todo lo demás rojo".
+    // `basePerms` viene del ROL del user en la bodega activa (no del
+    // admin que edita). Esto significa: si el user tenía un override
+    // que le daba `inventario.crear` y yo reseteo, le quito ese permiso
+    // extra y queda igual al rol.
     const inicial: PermisoEstado = {}
     for (const k of TODAS_LAS_KEYS) {
       inicial[k] = basePerms.has(k)
@@ -203,58 +236,90 @@ export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps
 
     setGuardando(true)
     try {
-      // 1) Actualizar info del usuario (nombre, email, rol, estado)
+      // ─── SPRINT 3: edición por-bodega ───
+      // Flujo:
+      //   1. Info global del user (nombre, email, estado) → PATCH /usuarios/:id
+      //   2. Rol + override de la bodega activa → PUT /usuarios/:id/bodegas/:bodegaActiva
+      //   3. Si el user editado soy yo, refrescar mi sesión para que
+      //      los cambios se vean reflejados en mi sidebar/permisos.
+      //
+      // El override de bodega se manda como array PLANO de keys
+      // (`modulo.accion` o `modulo.submodulo.accion`) — es lo que
+      // espera `UsuarioBodega.modulePermissions` (campo `String[]`).
+      // Si la matriz final coincide con el rol, mandamos `[]` para
+      // que el back borre el override y el user herede del rol.
+
+      // 1) Info global del user (sin rol ni bodegaId).
       await usuariosStore.actualizar(usuario.id, {
         nombre: nombre.trim(),
         email: email.trim(),
-        rol,
         estado,
       })
 
-      // 2) Construir el override final: la "foto completa" de permisos
-      //    del user, incluyendo lo del rol y los extras.
+      // 2) Construir la "foto" final de permisos para esta bodega.
+      //    El back espera un array PLANO de keys (`modulo.accion` o
+      //    `modulo.submodulo.accion`) en el campo `permisos` del body
+      //    de `PUT /usuarios/:id/bodegas/:bodegaId` (Sprint 3 fase 5).
       //
-      //    El back interpreta el override como la "foto final" (manda sobre
-      //    el rol). Si el override está presente, el rol se IGNORA. Por eso
-      //    tenemos que mandar TODO lo que está en verde, no solo los extras.
+      //    Semántica:
+      //    - Si la matriz coincide EXACTAMENTE con el rol del user
+      //      en la bodega → mandamos `[]` (borrar override, heredar
+      //      del rol). NO mandamos la foto del rol porque ya la tiene
+      //      el back.
+      //    - Si la matriz difiere del rol → mandamos TODA la foto
+      //      como array plano. El back lo guarda como override
+      //      REEMPLAZANDO al rol.
       //
-      //    Si la foto verde coincide EXACTAMENTE con el rol (sin extras ni
-      //    denegados), mandamos `null` para borrar el override y que el
-      //    user herede del rol puro (más limpio).
-      const overrideFinal: ModulePermissionMap = {}
+      //    Antes (BUG): se armaba un objeto `ModulePermissionMap` con
+      //    las keys prendidas y se mandaba eso. Pero el endpoint
+      //    multibodega espera un `string[]` (lo guarda en
+      //    `UsuarioBodega.modulePermissions` que es `String[]`).
+      //    Además se mandaba "todo lo verde" en vez de la diferencia
+      //    con el rol, lo que duplicaba los permisos del rol en el
+      //    override.
+      const matrizKeys: string[] = []
       for (const k of TODAS_LAS_KEYS) {
-        if (!permisos[k]) continue
-        const parts = k.split('.')
-        if (parts.length === 2) {
-          const [mod, a] = parts
-          if (!overrideFinal[mod]) overrideFinal[mod] = {}
-          if (!overrideFinal[mod][mod]) overrideFinal[mod][mod] = []
-          if (!overrideFinal[mod][mod].includes(a)) overrideFinal[mod][mod].push(a)
-        } else if (parts.length === 3) {
-          const [mod, sub, a] = parts
-          if (!overrideFinal[mod]) overrideFinal[mod] = {}
-          if (!overrideFinal[mod][sub]) overrideFinal[mod][sub] = []
-          if (!overrideFinal[mod][sub].includes(a)) overrideFinal[mod][sub].push(a)
+        if (permisos[k]) matrizKeys.push(k)
+      }
+
+      // ¿La matriz final coincide con los permisos del rol?
+      // Comparamos sets (no importa el orden).
+      const rolSet = new Set(basePerms)
+      const matrizSet = new Set(matrizKeys)
+      let coincideConRol = matrizSet.size === rolSet.size
+      if (coincideConRol) {
+        for (const k of matrizSet) {
+          if (!rolSet.has(k)) {
+            coincideConRol = false
+            break
+          }
         }
       }
 
-      // 3) Persistir
-      //    - Si overrideFinal tiene keys → mandar la foto completa
-      //    - Si overrideFinal está vacío Y había override original
-      //      → mandar null para borrar el override (vuelve a heredar del rol)
-      //    - Si overrideFinal está vacío Y NO había override
-      //      → no mandar nada (dejar al user como está, que es con el rol)
-      const tieneKeys = Object.values(overrideFinal).some((subs) =>
-        Object.values(subs ?? {}).some((acts) => acts.length > 0),
-      )
-      if (tieneKeys) {
-        await apiReplacePermisosOverride(usuario.id, overrideFinal)
-      } else if (overrideOriginal && Object.keys(overrideOriginal).length > 0) {
-        await apiReplacePermisosOverride(usuario.id, null)
-      }
-      // Si no había override y no hay keys nuevas, no mandamos nada
+      // Decidir qué mandar:
+      //   - coincideConRol === true → `[]` (back borra override)
+      //   - coincideConRol === false → `matrizKeys` (foto nueva)
+      // En cualquier caso, mandamos SIEMPRE `permisos` para que la
+      // operación sea explícita y no dependa del estado previo.
+      const permisosParaEnviar: string[] = coincideConRol ? [] : matrizKeys
 
-      // 4) Si soy yo, refrescar mi sesión
+      // 2.b) Hacer el upsert por-bodega con el ROL del formulario
+      // (que representa el rol que el user tiene EN ESTA BODEGA).
+      // Sin bodega activa no podemos operar (el modal no debería
+      // haberse abierto sin bodega, pero por las dudas).
+      const bodegaActivaId = bodegaActivaStore.getId()
+      if (!bodegaActivaId) {
+        throw new Error('No hay bodega activa. Cerrá el modal y reintentá.')
+      }
+      await api.put<unknown>(
+        `/usuarios/${usuario.id}/bodegas/${bodegaActivaId}`,
+        {
+          rolKey: rol,
+          permisos: permisosParaEnviar,
+        },
+      )
+
+      // 3) Si soy yo, refrescar mi sesión.
       const yo = authStore.getSnapshot()
       if (yo.status === 'autenticado' && yo.sesion.usuario.id === usuario.id) {
         await authStore.refrescar()
@@ -295,251 +360,312 @@ export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-3xl max-h-[92vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary/15 flex items-center justify-center">
-              <Pencil size={16} className="text-primary" />
-            </div>
-            <div>
-              <h2
-                className="text-xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                Editar usuario
-              </h2>
-              <p
-                className="mt-1 text-xs text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                Ajustá los permisos que este usuario tendrá por sobre los de su rol
-              </p>
-            </div>
-          </div>
+    <Modal
+      open
+      onClose={onClose}
+      title="Editar usuario"
+      description="Ajustá los permisos que este usuario tendrá por sobre los de su rol"
+      icon={<Pencil size={16} className="text-primary" />}
+      size="lg"
+      footer={
+        <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={onClose}
             disabled={guardando}
-            className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            className="flex-1 min-h-[44px] py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+            style={{ borderRadius: '0.25rem' }}
           >
-            <X size={18} />
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="editar-usuario-form"
+            disabled={guardando}
+            className="flex-1 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            {guardando ? (
+              <>
+                <span
+                  className="w-3.5 h-3.5 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin"
+                  aria-hidden
+                />
+                Guardando…
+              </>
+            ) : (
+              'Guardar cambios'
+            )}
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-5 space-y-5">
-            {/* INFORMACIÓN */}
-            <Section title="Información del usuario" icon={Pencil}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Nombre completo" required>
-                  <input
-                    type="text"
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    className={inputClass}
-                    disabled={guardando}
-                  />
-                </Field>
-                <Field label="Email" required>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={inputClass}
-                    disabled={guardando}
-                  />
-                </Field>
-                <Field label="Rol" required>
-                  <select
-                    value={rol}
-                    onChange={(e) => setRol(e.target.value as RolUsuario)}
-                    className={inputClass}
-                    disabled={guardando}
-                  >
-                    {roles
-                      // Excluimos los roles reservados del sistema
-                      // (admin, superadmin) del dropdown de edición.
-                      .filter((r) => r.key !== 'admin' && r.key !== 'superadmin')
-                      .map((r) => (
-                        <option key={r.id} value={r.key}>
-                          {r.nombre}
-                        </option>
-                      ))}
-                  </select>
-                </Field>
-                <Field label="Estado" required>
-                  <select
-                    value={estado}
-                    onChange={(e) => setEstado(e.target.value as EstadoUsuario)}
-                    className={inputClass}
-                    disabled={guardando}
-                  >
-                    {ESTADOS.map((es) => (
-                      <option key={es} value={es}>
-                        {es}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-            </Section>
-
-            {/* PERMISOS DEL USUARIO */}
-            <Section
-              title="Permisos del usuario"
-              icon={ShieldCheck}
-              trailing={
-                <button
-                  type="button"
-                  onClick={resetMatriz}
-                  disabled={!overrideDirty || guardando}
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  <RotateCcw size={11} />
-                  Reset al rol
-                </button>
-              }
-            >
-              <p
-                className="text-xs text-muted-foreground mb-3"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
+      }
+    >
+      <form id="editar-usuario-form" onSubmit={handleSubmit} className="p-5 space-y-5">
+        {/* INFORMACIÓN */}
+        <Section title="Información del usuario" icon={Pencil}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Nombre completo" required>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                className={inputClass}
+                disabled={guardando}
+              />
+            </Field>
+            <Field label="Email" required>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                disabled={guardando}
+              />
+            </Field>
+            <Field label="Rol" required>
+              <select
+                value={rol}
+                onChange={(e) => setRol(e.target.value as RolUsuario)}
+                className={inputClass}
+                disabled={guardando}
               >
-                <span className="text-secondary font-medium">Verde</span> = el usuario tiene el permiso.{' '}
-                <span className="text-primary font-medium">Rojo</span> = no lo tiene. Arranca con todo lo del rol
-                en verde, más lo que vos hayas configurado antes. Tildá/destildá solo lo que querés cambiar.
-              </p>
-
-              <div
-                className="flex items-center gap-3 mb-3 text-[10px]"
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                {roles
+                  // Admin puede ser delegado; superadmin no es asignable.
+                  .filter((r) => r.key !== 'superadmin')
+                  .map((r) => (
+                    <option key={r.id} value={r.key}>
+                      {r.nombre}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Field label="Estado" required>
+              <select
+                value={estado}
+                onChange={(e) => setEstado(e.target.value as EstadoUsuario)}
+                className={inputClass}
+                disabled={guardando}
               >
-                <Legend color="bg-secondary/15 border-secondary/40 text-secondary" label="Tiene" />
-                <Legend color="bg-primary/15 border-primary/40 text-primary" label="No tiene" />
-                <span className="ml-auto text-muted-foreground">
-                  {counts.totalOn} activos · {counts.totalOff} inactivos
-                </span>
-              </div>
-
-              {cargando ? (
-                <div className="p-8 flex items-center justify-center gap-3">
-                  <span
-                    className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin"
-                    aria-hidden
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    Cargando permisos del usuario…
-                  </span>
-                </div>
-              ) : (
-                <div
-                  className="bg-muted/30 border border-border overflow-hidden"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <table className="w-full">
-                    <thead>
-                      <tr
-                        className="border-b border-border bg-card"
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                      >
-                        <th className="text-left px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal">
-                          Módulo / Sub-módulo
-                        </th>
-                        {ACCIONES.map((a) => (
-                          <th
-                            key={a}
-                            className="text-center px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal"
-                          >
-                            {ACCION_LABELS[a]}
-                          </th>
-                        ))}
-                        <th className="text-center px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal w-16">
-                          todo
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {MODULOS.map((m) => {
-                        const subs = m.submodulos ?? []
-                        if (subs.length === 0) {
-                          return renderFilaModuloPlano(m, {
-                            togglePermiso,
-                            toggleModuloCompleto,
-                            cellClass,
-                            cellIcon,
-                          })
-                        }
-                        return renderGrupoModulo(
-                          { ...m, submodulos: subs },
-                          {
-                            expanded: expanded.has(m.key),
-                            onToggleExpand: () => toggleExpand(m.key),
-                            togglePermiso,
-                            toggleSubmoduloCompleto,
-                            cellClass,
-                            cellIcon,
-                          },
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Section>
-
-            {error && (
-              <div
-                className="flex items-start gap-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  borderRadius: '0.25rem',
-                }}
-              >
-                <CircleAlert size={13} className="mt-0.5 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+                {ESTADOS.map((es) => (
+                  <option key={es} value={es}>
+                    {es}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
+        </Section>
 
-          <div className="p-4 border-t border-border flex items-center gap-3">
+        {/* PERMISOS DEL USUARIO */}
+        <Section
+          title="Permisos del usuario"
+          icon={ShieldCheck}
+          trailing={
             <button
               type="button"
-              onClick={onClose}
-              disabled={guardando}
-              className="flex-1 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
-              style={{ borderRadius: '0.25rem' }}
+              onClick={resetMatriz}
+              disabled={!overrideDirty || guardando}
+              className="inline-flex items-center gap-1.5 min-h-[44px] px-2 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-              Cancelar
+              <RotateCcw size={11} />
+              Reset al rol
             </button>
-            <button
-              type="submit"
-              disabled={guardando}
-              className="flex-1 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
-              style={{ borderRadius: '0.25rem' }}
-            >
-              {guardando ? (
-                <>
-                  <span
-                    className="w-3.5 h-3.5 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin"
-                    aria-hidden
-                  />
-                  Guardando…
-                </>
-              ) : (
-                'Guardar cambios'
-              )}
-            </button>
+          }
+        >
+          <p
+            className="text-xs text-muted-foreground mb-3"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+          >
+            <span className="text-secondary font-medium">Verde</span> = el usuario tiene el permiso.{' '}
+            <span className="text-primary font-medium">Rojo</span> = no lo tiene. Arranca con todo lo del rol
+            en verde, más lo que vos hayas configurado antes. Tildá/destildá solo lo que querés cambiar.
+          </p>
+
+          <div
+            className="flex items-center gap-3 mb-3 text-[10px]"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            <Legend color="bg-secondary/15 border-secondary/40 text-secondary" label="Tiene" />
+            <Legend color="bg-primary/15 border-primary/40 text-primary" label="No tiene" />
+            <span className="ml-auto text-muted-foreground">
+              {counts.totalOn} activos · {counts.totalOff} inactivos
+            </span>
           </div>
-        </form>
-      </div>
-    </div>
+
+          {cargando ? (
+            <div className="p-8 flex items-center justify-center gap-3">
+              <span
+                className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin"
+                aria-hidden
+              />
+              <span className="text-sm text-muted-foreground">
+                Cargando permisos del usuario…
+              </span>
+            </div>
+          ) : (
+            <>
+              {/* ── DESKTOP: tabla (md+) ─────────────────────── */}
+              <div
+                className="hidden md:block bg-muted/30 border border-border overflow-hidden"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr
+                      className="border-b border-border bg-card"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      <th className="text-left px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal">
+                        Módulo / Sub-módulo
+                      </th>
+                      {ACCIONES.map((a) => (
+                        <th
+                          key={a}
+                          className="text-center px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal"
+                        >
+                          {ACCION_LABELS[a]}
+                        </th>
+                      ))}
+                      <th className="text-center px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal w-16">
+                        todo
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {MODULOS.map((m) => {
+                      const subs = m.submodulos ?? []
+                      if (subs.length === 0) {
+                        return renderFilaModuloPlano(m, {
+                          togglePermiso,
+                          toggleModuloCompleto,
+                          cellClass,
+                          cellIcon,
+                        })
+                      }
+                      return renderGrupoModulo(
+                        { ...m, submodulos: subs },
+                        {
+                          expanded: expanded.has(m.key),
+                          onToggleExpand: () => toggleExpand(m.key),
+                          togglePermiso,
+                          toggleSubmoduloCompleto,
+                          cellClass,
+                          cellIcon,
+                        },
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ── MOBILE: lista de acordeones (<md) ──────────
+                  Mismo patrón que la matriz de Roles. Un módulo = un
+                  acordeón; los submódulos se ven dentro como tarjetas
+                  con grilla 3+1 de acciones. */}
+              <ul className="md:hidden divide-y divide-border border border-border bg-muted/30" style={{ borderRadius: '0.25rem' }}>
+                {MODULOS.map((m) => {
+                  const subs = m.submodulos ?? []
+                  const isOpen = expanded.has(m.key)
+                  return (
+                    <li key={m.key}>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(m.key)}
+                        className="w-full text-left p-3 flex items-center gap-3 hover:bg-muted/50 active:bg-muted/70 transition-colors"
+                        aria-expanded={isOpen}
+                      >
+                        <ChevronRight
+                          size={14}
+                          className={`text-muted-foreground shrink-0 transition-transform ${
+                            isOpen ? 'rotate-90' : ''
+                          }`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className="text-sm text-foreground"
+                            style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}
+                          >
+                            {m.label}
+                          </div>
+                          <div
+                            className="text-[10px] text-muted-foreground mt-0.5"
+                            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                          >
+                            {subs.length > 0
+                              ? `${subs.length} sub-módulos`
+                              : `${m.acciones.length} acciones`}
+                          </div>
+                        </div>
+                        <ModuloBadgeCell
+                          keys={(subs.length > 0
+                            ? [keyVerPadre(m.key), ...subs.flatMap((s) => ACCIONES.map((a) => `${m.key}.${s.key}.${a}`))]
+                            : m.acciones.map((a) => `${m.key}.${a}`)
+                          ).map((k) => k as Permiso)}
+                          permisos={permisos}
+                          basePerms={basePerms}
+                        />
+                      </button>
+
+                      {isOpen && (
+                        <div className="px-3 pb-3 pt-1 space-y-3 bg-background/40">
+                          {subs.length === 0 ? (
+                            <ModuloAccionesGridMovil
+                              moduloKey={m.key}
+                              acciones={m.acciones}
+                              permisos={permisos}
+                              basePerms={basePerms}
+                              onToggle={togglePermiso}
+                              onToggleTodo={() => toggleModuloCompleto(m)}
+                            />
+                          ) : (
+                            <>
+                              <ModuloAccionesGridMovil
+                                moduloKey={m.key}
+                                acciones={['ver']}
+                                permisos={permisos}
+                                basePerms={basePerms}
+                                onToggle={togglePermiso}
+                                labelOverride="Ver módulo (abre el submenú)"
+                                singleAction
+                              />
+                              {subs.map((s) => (
+                                <SubmoduloAccionesGridMovil
+                                  key={`${m.key}.${s.key}`}
+                                  moduloKey={m.key}
+                                  sub={s}
+                                  permisos={permisos}
+                                  basePerms={basePerms}
+                                  onToggle={togglePermiso}
+                                  onToggleTodo={() => toggleSubmoduloCompleto(m.key, s)}
+                                />
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+        </Section>
+
+        {error && (
+          <div
+            className="flex items-start gap-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              borderRadius: '0.25rem',
+            }}
+          >
+            <CircleAlert size={13} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+      </form>
+    </Modal>
   )
 }
 
@@ -703,7 +829,7 @@ function renderGrupoModulo(
 }
 
 const inputClass =
-  'w-full px-3 py-2.5 bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors disabled:opacity-50'
+  'w-full px-3 py-2.5 min-h-[44px] bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors disabled:opacity-50'
 
 function Section({
   title,
@@ -770,5 +896,211 @@ function Legend({ color, label }: { color: string; label: string }) {
     >
       {label}
     </span>
+  )
+}
+
+// ─────────────────────────────────────────────
+//  Helpers mobile (acordeones + grilla de acciones)
+//  Mismo patrón visual que la matriz de Roles.tsx
+// ─────────────────────────────────────────────
+
+/**
+ * Badge compacto a la derecha del header del acordeón.
+ * Resume el estado de todas las acciones de un módulo / grupo:
+ *  - Verde  → todas activas
+ *  - Naranja → algunas activas (mixto)
+ *  - Gris   → todas inactivas
+ */
+function ModuloBadgeCell({
+  keys,
+  permisos,
+  basePerms,
+}: {
+  keys: Permiso[]
+  permisos: PermisoEstado
+  basePerms: Set<string>
+}) {
+  if (keys.length === 0) return null
+  const on = keys.filter((k) => permisos[k]).length
+  const total = keys.length
+  const allOn = on === total
+  const someOn = on > 0
+  const dot = allOn
+    ? 'bg-secondary'
+    : someOn
+      ? 'bg-primary'
+      : 'bg-muted-foreground/30'
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span
+        className="text-[10px] text-muted-foreground"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        {on}/{total}
+      </span>
+      <span className={`w-2 h-2 rounded-full ${dot}`} aria-hidden />
+    </div>
+  )
+}
+
+/**
+ * Grilla mobile de acciones para un módulo SIN sub-módulos
+ * (o para el "ver" del padre cuando SÍ tiene sub-módulos).
+ * Botones grandes (min-h-11) para touch, con grilla 3 columnas.
+ */
+function ModuloAccionesGridMovil({
+  moduloKey,
+  acciones,
+  permisos,
+  basePerms,
+  onToggle,
+  onToggleTodo,
+  labelOverride,
+  singleAction,
+}: {
+  moduloKey: string
+  acciones: string[]
+  permisos: PermisoEstado
+  basePerms: Set<string>
+  onToggle: (p: Permiso) => void
+  onToggleTodo?: () => void
+  labelOverride?: string
+  singleAction?: boolean
+}) {
+  const keys = acciones.map((a) => `${moduloKey}.${a}` as Permiso)
+  const onCount = keys.filter((k) => permisos[k]).length
+  const allOn = onCount === keys.length
+  const someOn = onCount > 0
+
+  return (
+    <div>
+      {labelOverride && (
+        <div
+          className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {labelOverride}
+        </div>
+      )}
+      <div className={`grid gap-2 ${singleAction ? 'grid-cols-1' : 'grid-cols-3'}`}>
+        {acciones.map((a) => {
+          const p = `${moduloKey}.${a}` as Permiso
+          const has = permisos[p]
+          const isBase = basePerms.has(p)
+          // Mismo lenguaje visual que la versión desktop:
+          // verde activo, rojo si está denegado del rol, gris normal.
+          const cls = has
+            ? 'border-secondary/50 bg-secondary/15 text-secondary'
+            : !has && isBase
+              ? 'border-primary/50 bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground'
+          return (
+            <button
+              key={a}
+              type="button"
+              onClick={() => onToggle(p)}
+              className={`min-h-[44px] px-2 py-2 border text-xs transition-colors ${cls} flex items-center justify-center gap-1.5`}
+              style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              {has && <Check size={12} />}
+              {ACCION_LABELS[a as Accion] ?? a}
+            </button>
+          )
+        })}
+      </div>
+      {onToggleTodo && (
+        <button
+          type="button"
+          onClick={onToggleTodo}
+          className={`mt-2 w-full min-h-[44px] px-2 py-2 border text-xs transition-colors ${
+            allOn
+              ? 'border-secondary/50 bg-secondary/15 text-secondary'
+              : someOn
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground'
+          } flex items-center justify-center gap-1.5`}
+          style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+        >
+          {allOn && <Check size={12} />}
+          {singleAction ? 'Invertir' : 'Todo el módulo'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Grilla mobile de acciones para un sub-módulo concreto.
+ * Muestra el label del sub-módulo arriba, la grilla de 4 acciones, y
+ * el botón "Todo" para invertir todo el sub.
+ */
+function SubmoduloAccionesGridMovil({
+  moduloKey,
+  sub,
+  permisos,
+  basePerms,
+  onToggle,
+  onToggleTodo,
+}: {
+  moduloKey: string
+  sub: { key: string; label: string }
+  permisos: PermisoEstado
+  basePerms: Set<string>
+  onToggle: (p: Permiso) => void
+  onToggleTodo: () => void
+}) {
+  const keys = ACCIONES.map((a) => `${moduloKey}.${sub.key}.${a}` as Permiso)
+  const onCount = keys.filter((k) => permisos[k]).length
+  const allOn = onCount === keys.length
+  const someOn = onCount > 0
+
+  return (
+    <div>
+      <div
+        className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        {sub.label}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {ACCIONES.map((a) => {
+          const p = `${moduloKey}.${sub.key}.${a}` as Permiso
+          const has = permisos[p]
+          const isBase = basePerms.has(p)
+          const cls = has
+            ? 'border-secondary/50 bg-secondary/15 text-secondary'
+            : !has && isBase
+              ? 'border-primary/50 bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground'
+          return (
+            <button
+              key={a}
+              type="button"
+              onClick={() => onToggle(p)}
+              className={`min-h-[44px] px-2 py-2 border text-xs transition-colors ${cls} flex items-center justify-center gap-1.5`}
+              style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              {has && <Check size={12} />}
+              {ACCION_LABELS[a]}
+            </button>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onToggleTodo}
+        className={`mt-2 w-full min-h-[44px] px-2 py-2 border text-xs transition-colors ${
+          allOn
+            ? 'border-secondary/50 bg-secondary/15 text-secondary'
+            : someOn
+              ? 'border-primary/50 bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground'
+        } flex items-center justify-center gap-1.5`}
+        style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
+      >
+        {allOn && <Check size={12} />}
+        Todo
+      </button>
+    </div>
   )
 }

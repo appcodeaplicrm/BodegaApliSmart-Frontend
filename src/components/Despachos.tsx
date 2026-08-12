@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Truck, Inbox, Loader2, PackageOpen } from 'lucide-react'
+import { Truck, Inbox, Loader2, PackageOpen, ChevronRight } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import {
@@ -110,7 +110,7 @@ export function Despachos() {
         subtitle={`STOCKPRO · ${usuarioRol.toUpperCase()} · ${usuarioNombre}`}
       />
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
         <div className="space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -250,7 +250,15 @@ export function Despachos() {
         />
       )}
       {detalle && (
-        <OrdenDetalleModal pedido={detalle} onClose={() => setDetalle(null)} />
+        <OrdenDetalleModal
+          pedido={detalle}
+          onClose={() => setDetalle(null)}
+          onResolver={() => {
+            const p = detalle
+            setDetalle(null)
+            setAccion(p)
+          }}
+        />
       )}
     </div>
   )
@@ -266,86 +274,118 @@ function TablaDespachos({
   onVer: (p: PedidoListItem) => void
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr
-            className="border-b border-border bg-muted/30"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
-          >
-            <Th>Código</Th>
-            <Th>Productos</Th>
-            <Th>Motivo</Th>
-            <Th>Estado</Th>
-            <Th>Revisión</Th>
-            <Th>Enviada</Th>
-            <Th className="text-right">Acción</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((o) => (
-            <tr
-              key={o.id}
+    <>
+      {/* MOBILE: lista compacta (Código / Estado / Revisión) → tap = modal detalle.
+          La acción contextual (Resolver / Ver) está en el footer del modal,
+          no inline en la fila, para mantenerla limpia. */}
+      <ul className="sm:hidden divide-y divide-border">
+        {rows.map((o) => (
+          <li key={o.id}>
+            <button
+              type="button"
               onClick={() => onVer(o)}
-              className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+              className="w-full text-left px-4 py-3.5 hover:bg-muted/30 active:bg-muted/50 transition-colors flex items-center gap-3 min-h-[60px]"
             >
-              <Td>
-                <span
-                  className="text-primary"
+              <div className="min-w-0 flex-1">
+                <div
+                  className="text-sm text-primary truncate"
                   style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}
                 >
                   {o.codigo}
-                </span>
-              </Td>
-              <Td>
-                <div className="text-sm text-foreground">
-                  {o.items.length === 1 ? '1 ítem' : `${o.items.length} ítems`}
                 </div>
-              </Td>
-              <Td>
-                <span className="text-sm text-muted-foreground">{o.motivo || '—'}</span>
-              </Td>
-              <Td>
-                <EstadoBadge estado={o.estadoNombre} />
-              </Td>
-              <Td>
-                <RevisionBadge estado={o.revisionEstado} />
-              </Td>
-              <Td>
-                <span
-                  className="text-xs text-muted-foreground"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  {o.createdAtLabel}
-                </span>
-              </Td>
-              <Td>
-                <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-                  {onAccion ? (
-                    <button
-                      onClick={() => onAccion(o)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground text-xs hover:bg-primary/90 transition-colors"
-                      style={{ borderRadius: '0.25rem' }}
-                    >
-                      <PackageOpen size={13} />
-                      Resolver
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => onVer(o)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 border border-border text-xs text-foreground hover:border-foreground/30 transition-colors"
-                      style={{ borderRadius: '0.25rem' }}
-                    >
-                      Ver
-                    </button>
-                  )}
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                  <EstadoBadge estado={o.estadoNombre} />
+                  <RevisionBadge estado={o.revisionEstado} />
                 </div>
-              </Td>
+              </div>
+              <ChevronRight size={18} className="text-muted-foreground shrink-0" />
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {/* DESKTOP: tabla completa intacta */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr
+              className="border-b border-border bg-muted/30"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              <Th>Código</Th>
+              <Th>Productos</Th>
+              <Th>Motivo</Th>
+              <Th>Estado</Th>
+              <Th>Revisión</Th>
+              <Th>Enviada</Th>
+              <Th className="text-right">Acción</Th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((o) => (
+              <tr
+                key={o.id}
+                onClick={() => onVer(o)}
+                className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+              >
+                <Td>
+                  <span
+                    className="text-primary"
+                    style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}
+                  >
+                    {o.codigo}
+                  </span>
+                </Td>
+                <Td>
+                  <div className="text-sm text-foreground">
+                    {o.items.length === 1 ? '1 ítem' : `${o.items.length} ítems`}
+                  </div>
+                </Td>
+                <Td>
+                  <span className="text-sm text-muted-foreground">{o.motivo || '—'}</span>
+                </Td>
+                <Td>
+                  <EstadoBadge estado={o.estadoNombre} />
+                </Td>
+                <Td>
+                  <RevisionBadge estado={o.revisionEstado} />
+                </Td>
+                <Td>
+                  <span
+                    className="text-xs text-muted-foreground"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    {o.createdAtLabel}
+                  </span>
+                </Td>
+                <Td>
+                  <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    {onAccion ? (
+                      <button
+                        onClick={() => onAccion(o)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground text-xs hover:bg-primary/90 transition-colors"
+                        style={{ borderRadius: '0.25rem' }}
+                      >
+                        <PackageOpen size={13} />
+                        Resolver
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onVer(o)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 border border-border text-xs text-foreground hover:border-foreground/30 transition-colors"
+                        style={{ borderRadius: '0.25rem' }}
+                      >
+                        Ver
+                      </button>
+                    )}
+                  </div>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 

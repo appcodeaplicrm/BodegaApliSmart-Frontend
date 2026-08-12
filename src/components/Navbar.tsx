@@ -15,9 +15,9 @@ export function Navbar() {
   return (
     <header
       className="fixed top-0 inset-x-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border"
-      style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}
+      style={{ fontFamily: "'DM Sans', system-ui, sans-serif", paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <a href="#" className="flex items-center">
           <span
             className="text-foreground text-2xl tracking-wider"
@@ -63,9 +63,10 @@ export function Navbar() {
         </div>
 
         <button
-          className="md:hidden text-foreground p-2 -mr-2"
+          className="md:hidden text-foreground min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center"
           onClick={() => setOpen((o) => !o)}
-          aria-label="Menú"
+          aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={open}
         >
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>

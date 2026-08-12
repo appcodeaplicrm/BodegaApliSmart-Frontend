@@ -26,7 +26,6 @@ import {
   DollarSign,
   Inbox,
 } from 'lucide-react'
-import { SelectorBodega } from './SelectorBodega'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useDashboard, dashboardStore } from '../store/dashboard'
 
@@ -63,8 +62,8 @@ export function DashboardView() {
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* TOPBAR */}
-      <header className="h-14 border-b border-border px-6 flex items-center justify-between shrink-0 gap-3">
-        <div className="min-w-0">
+      <header className="min-h-14 border-b border-border px-4 sm:px-6 py-3 sm:py-0 sm:flex sm:items-center sm:justify-between shrink-0 gap-3 flex-wrap">
+        <div className="min-w-0 flex-1">
           <h1
             className="text-2xl uppercase text-foreground leading-none"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
@@ -72,7 +71,7 @@ export function DashboardView() {
             Dashboard
           </h1>
           <div
-            className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1"
+            className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 truncate"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             {dashState.status === 'listo'
@@ -81,13 +80,12 @@ export function DashboardView() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <SelectorBodega />
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
           <button
             type="button"
             onClick={handleRefresh}
             disabled={dashState.status === 'cargando' || !activaId}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border text-xs text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 border border-border text-xs text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
           >
             <RefreshCcw
@@ -100,7 +98,7 @@ export function DashboardView() {
       </header>
 
       {/* CONTENIDO */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 min-h-0">
         {dashState.status === 'idle' || dashState.status === 'cargando' ? (
           <DashboardSkeleton />
         ) : dashState.status === 'error' ? (

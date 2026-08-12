@@ -10,10 +10,12 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
+  Inbox,
 } from 'lucide-react'
 import type { PedidoListItem, EntregaItem } from '../store/pedidos'
 import { api, ApiError } from '../lib/api'
 import { uploadsService } from '../store/productos'
+import { Modal } from './Modal'
 
 type Props = {
   pedido: PedidoListItem
@@ -219,268 +221,36 @@ export function WizardAprobacion({ pedido, rol, items, onClose, onResolved }: Pr
   // ─── Render ────────────────────────────────────────────
   if (!current) {
     return (
-      <div
-        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-        onClick={onClose}
+      <Modal
+        open
+        onClose={onClose}
+        title="Sin items para procesar"
+        description={pedido.codigo}
+        icon={<Inbox size={16} className="text-primary" />}
+        size="sm"
       >
-        <div
-          className="bg-card border border-border p-6 max-w-md"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <p className="text-foreground">No hay items para procesar.</p>
-        </div>
-      </div>
+        <p className="p-5 text-foreground">No hay items para procesar.</p>
+      </Modal>
     )
   }
 
   const rolLabel = rol === 'bodega' ? 'Bodega' : 'Técnico'
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-card border border-border w-full max-w-2xl max-h-[92vh] flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div>
-            <div
-              className="text-[10px] text-muted-foreground tracking-widest uppercase"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              {pedido.codigo} · {rolLabel}
-            </div>
-            <h2
-              className="text-xl uppercase text-foreground mt-1 leading-none"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-            >
-              Wizard de aprobación
-            </h2>
-            <p
-              className="mt-1 text-xs text-muted-foreground"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Foto por producto o saltear si no hay stock
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Cerrar"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Stepper / progress bar (como en la captura) */}
-        <div className="px-5 pt-4 pb-2 shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            {items.map((_it, idx) => {
-              const done = idx < stepIdx
-              const current = idx === stepIdx
-              return (
-                <div key={idx} className="flex-1 flex items-center">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${
-                        done
-                          ? 'bg-primary border-primary text-primary-foreground'
-                          : current
-                            ? 'bg-primary/15 border-primary text-primary'
-                            : 'bg-muted border-border text-muted-foreground'
-                      }`}
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    >
-                      {done ? <Check size={14} /> : String(idx + 1).padStart(2, '0')}
-                    </div>
-                    <div
-                      className={`mt-1 text-[10px] tracking-widest uppercase ${
-                        done || current ? 'text-foreground' : 'text-muted-foreground'
-                      }`}
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    >
-                      {done ? 'Listo' : current ? 'Actual' : 'Pendiente'}
-                    </div>
-                  </div>
-                  {idx < items.length - 1 && (
-                    <div
-                      className={`flex-1 h-0.5 mx-1 ${
-                        done ? 'bg-primary' : 'bg-border'
-                      }`}
-                    />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Body: el step actual */}
-        <form className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div
-            className="bg-muted/40 border border-border p-3"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div
-                  className="text-[10px] text-muted-foreground tracking-widest uppercase"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  {current.kitNombre ? `Parte de: ${current.kitNombre}` : 'Producto'}
-                </div>
-                <div
-                  className="text-lg text-foreground mt-0.5"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
-                >
-                  {current.productoNombre}
-                </div>
-                <div
-                  className="text-[10px] text-muted-foreground"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  SKU {current.productoCodigo}
-                </div>
-              </div>
-              <div className="text-right">
-                <div
-                  className="text-[10px] text-muted-foreground tracking-widest uppercase"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  Cantidad
-                </div>
-                <div
-                  className="text-xl text-primary"
-                  style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}
-                >
-                  ×{current.cantidad}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Cámara / preview */}
-          <div>
-            <label
-              className="text-xs text-muted-foreground tracking-widest uppercase mb-1.5 block"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Foto de evidencia {rolLabel}
-            </label>
-            {cameraOn ? (
-              <div
-                className="relative w-full aspect-video bg-muted border border-border overflow-hidden flex items-center justify-center"
-                style={{ borderRadius: '0.25rem' }}
-              >
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  muted
-                />
-              </div>
-            ) : (
-              <div
-                className={`w-full flex items-center gap-2 py-2.5 px-3 border ${
-                  photoUrl
-                    ? 'border-secondary/40 bg-secondary/5 text-secondary'
-                    : 'border-border bg-muted text-muted-foreground'
-                }`}
-                style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
-              >
-                {photoUrl ? (
-                  <CheckCircle2 size={16} className="shrink-0" />
-                ) : (
-                  <ImageIcon size={16} className="shrink-0" />
-                )}
-                <span className="text-xs font-medium">
-                  {photoUrl ? 'Imagen subida' : 'Sin imagen'}
-                </span>
-              </div>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFile}
-              className="hidden"
-            />
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              {!cameraOn && !photoUrl && (
-                <>
-                  <button
-                    type="button"
-                    onClick={startCamera}
-                    className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm hover:border-foreground/30"
-                    style={{ borderRadius: '0.25rem' }}
-                  >
-                    <CameraIcon size={14} /> Abrir cámara
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm hover:border-foreground/30"
-                    style={{ borderRadius: '0.25rem' }}
-                  >
-                    <Camera size={14} /> Subir foto
-                  </button>
-                </>
-              )}
-              {cameraOn && (
-                <>
-                  <button
-                    type="button"
-                    onClick={capture}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground text-sm"
-                    style={{ borderRadius: '0.25rem' }}
-                  >
-                    <Camera size={14} /> Capturar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm"
-                    style={{ borderRadius: '0.25rem' }}
-                  >
-                    <X size={14} /> Cancelar cámara
-                  </button>
-                </>
-              )}
-              {photoUrl && !cameraOn && (
-                <button
-                  type="button"
-                  onClick={resetPhoto}
-                  className="inline-flex items-center gap-2 px-3 py-2 border border-border text-sm"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <RefreshCcw size={14} /> Tomar otra
-                </button>
-              )}
-            </div>
-          </div>
-
-          {error && (
-            <p
-              className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
-              style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
-            >
-              ⚠ {error}
-            </p>
-          )}
-        </form>
-
-        {/* Footer: nav + saltar */}
-        <div className="p-4 border-t border-border flex items-center gap-2 shrink-0">
+    <Modal
+      open
+      onClose={onClose}
+      title="Wizard de aprobación"
+      description={`${pedido.codigo} · ${rolLabel}`}
+      icon={<Camera size={16} className="text-primary" />}
+      size="lg"
+      footer={
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={goBack}
             disabled={isFirst || submitting || finalizing}
-            className="inline-flex items-center gap-1 px-3 py-2.5 border border-border text-sm hover:border-foreground/30 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1 min-h-[44px] px-3 py-2.5 border border-border text-sm hover:border-foreground/30 disabled:opacity-30 disabled:cursor-not-allowed"
             style={{ borderRadius: '0.25rem' }}
           >
             <ArrowLeft size={14} /> Anterior
@@ -492,7 +262,7 @@ export function WizardAprobacion({ pedido, rol, items, onClose, onResolved }: Pr
             type="button"
             onClick={handleTakePhoto}
             disabled={!photoUrl || submitting || uploading || finalizing}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '0.25rem' }}
           >
             {submitting || uploading ? (
@@ -512,8 +282,213 @@ export function WizardAprobacion({ pedido, rol, items, onClose, onResolved }: Pr
             )}
           </button>
         </div>
+      }
+    >
+      <div className="p-5 space-y-4">
+        <p
+          className="text-xs text-muted-foreground -mt-1"
+          style={{ fontFamily: "'DM Sans', sans-serif" }}
+        >
+          Foto por producto o saltear si no hay stock
+        </p>
+
+        {/* Stepper / progress bar (como en la captura) */}
+        <div className="-mx-1">
+          <div className="flex items-center justify-between mb-2">
+            {items.map((_it, idx) => {
+              const done = idx < stepIdx
+              const isCurrent = idx === stepIdx
+              return (
+                <div key={idx} className="flex-1 flex items-center">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${
+                        done
+                          ? 'bg-primary border-primary text-primary-foreground'
+                          : isCurrent
+                            ? 'bg-primary/15 border-primary text-primary'
+                            : 'bg-muted border-border text-muted-foreground'
+                      }`}
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {done ? <Check size={14} /> : String(idx + 1).padStart(2, '0')}
+                    </div>
+                    <div
+                      className={`mt-1 text-[10px] tracking-widest uppercase ${
+                        done || isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                      }`}
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {done ? 'Listo' : isCurrent ? 'Actual' : 'Pendiente'}
+                    </div>
+                  </div>
+                  {idx < items.length - 1 && (
+                    <div
+                      className={`flex-1 h-0.5 mx-1 ${
+                        done ? 'bg-primary' : 'bg-border'
+                      }`}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Body: el step actual */}
+        <div
+          className="bg-muted/40 border border-border p-3"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div
+                className="text-[10px] text-muted-foreground tracking-widest uppercase"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {current.kitNombre ? `Parte de: ${current.kitNombre}` : 'Producto'}
+              </div>
+              <div
+                className="text-lg text-foreground mt-0.5"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
+              >
+                {current.productoNombre}
+              </div>
+              <div
+                className="text-[10px] text-muted-foreground"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                SKU {current.productoCodigo}
+              </div>
+            </div>
+            <div className="text-right">
+              <div
+                className="text-[10px] text-muted-foreground tracking-widest uppercase"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                Cantidad
+              </div>
+              <div
+                className="text-xl text-primary"
+                style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}
+              >
+                ×{current.cantidad}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Cámara / preview */}
+        <div>
+          <label
+            className="text-xs text-muted-foreground tracking-widest uppercase mb-1.5 block"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            Foto de evidencia {rolLabel}
+          </label>
+          {cameraOn ? (
+            <div
+              className="relative w-full aspect-video bg-muted border border-border overflow-hidden flex items-center justify-center"
+              style={{ borderRadius: '0.25rem' }}
+            >
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                playsInline
+                muted
+              />
+            </div>
+          ) : (
+            <div
+              className={`w-full flex items-center gap-2 py-2.5 px-3 border ${
+                photoUrl
+                  ? 'border-secondary/40 bg-secondary/5 text-secondary'
+                  : 'border-border bg-muted text-muted-foreground'
+              }`}
+              style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {photoUrl ? (
+                <CheckCircle2 size={16} className="shrink-0" />
+              ) : (
+                <ImageIcon size={16} className="shrink-0" />
+              )}
+              <span className="text-xs font-medium">
+                {photoUrl ? 'Imagen subida' : 'Sin imagen'}
+              </span>
+            </div>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFile}
+            className="hidden"
+          />
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {!cameraOn && !photoUrl && (
+              <>
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
+                  style={{ borderRadius: '0.25rem' }}
+                >
+                  <CameraIcon size={14} /> Abrir cámara
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
+                  style={{ borderRadius: '0.25rem' }}
+                >
+                  <Camera size={14} /> Subir foto
+                </button>
+              </>
+            )}
+            {cameraOn && (
+              <>
+                <button
+                  type="button"
+                  onClick={capture}
+                  className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 bg-primary text-primary-foreground text-sm"
+                  style={{ borderRadius: '0.25rem' }}
+                >
+                  <Camera size={14} /> Capturar
+                </button>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm"
+                  style={{ borderRadius: '0.25rem' }}
+                >
+                  <X size={14} /> Cancelar cámara
+                </button>
+              </>
+            )}
+            {photoUrl && !cameraOn && (
+              <button
+                type="button"
+                onClick={resetPhoto}
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm"
+                style={{ borderRadius: '0.25rem' }}
+              >
+                <RefreshCcw size={14} /> Tomar otra
+              </button>
+            )}
+          </div>
+        </div>
+
+        {error && (
+          <p
+            className="text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2"
+            style={{ fontFamily: "'JetBrains Mono', monospace", borderRadius: '0.25rem' }}
+          >
+            ⚠ {error}
+          </p>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 

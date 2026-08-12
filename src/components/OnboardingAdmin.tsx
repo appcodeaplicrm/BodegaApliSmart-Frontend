@@ -50,7 +50,7 @@ export function OnboardingAdmin() {
   }
 
   return (
-    <div className="h-screen w-screen bg-background flex overflow-hidden">
+    <div className="h-dvh w-screen bg-background flex overflow-hidden">
       {/* ─── Lado izquierdo: copy + branding ──────────────── */}
       <aside className="hidden lg:flex lg:w-1/2 relative border-r border-border p-12 flex-col justify-between overflow-hidden">
         {/* fondo decorativo */}

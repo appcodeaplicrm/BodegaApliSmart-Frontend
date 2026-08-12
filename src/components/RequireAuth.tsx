@@ -50,7 +50,7 @@ export function RequireAuth({ children, fallback, loadingFallback }: RequireAuth
 
 function FullScreenLoader() {
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-background">
+    <div className="h-dvh w-screen flex items-center justify-center bg-background">
       <div className="flex items-center gap-3 text-muted-foreground">
         <span
           className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary rounded-full animate-spin"
