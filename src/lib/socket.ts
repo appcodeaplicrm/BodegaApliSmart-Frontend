@@ -123,7 +123,16 @@ export function setActiveBodega(bodegaId: string | null): void {
 function getSocketUrl(): string {
   if (typeof window === 'undefined') return ''
   const envBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
-  if (envBase) return envBase
+  // VITE_API_URL puede terminar en /api. Socket.IO interpretaría ese
+  // segmento como el namespace "/api", pero el gateway usa el namespace
+  // raíz. La ruta HTTP real se configura aparte mediante `path`.
+  if (envBase) {
+    try {
+      return new URL(envBase, window.location.origin).origin
+    } catch {
+      return window.location.origin
+    }
+  }
   const { protocol, hostname } = window.location
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return `${protocol}//${hostname}:3001`
