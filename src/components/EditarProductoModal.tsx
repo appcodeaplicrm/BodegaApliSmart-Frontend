@@ -471,11 +471,13 @@ function Field({
   label,
   required,
   icon: Icon,
+  hint,
   children,
 }: {
   label: string
   required?: boolean
   icon?: typeof Tag
+  hint?: string
   children: React.ReactNode
 }) {
   return (
@@ -487,6 +489,7 @@ function Field({
         {Icon && <Icon size={11} />}
         {label}
         {required && <span className="text-primary">*</span>}
+        {hint && <span className="ml-auto normal-case tracking-normal">{hint}</span>}
       </label>
       {children}
     </div>

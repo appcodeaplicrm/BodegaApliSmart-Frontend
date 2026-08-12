@@ -78,7 +78,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // mientras el usuario esté autenticado. Cada vez que llega un
   // evento, despachamos al store correspondiente.
   useRealtimeEvent('alerta.created', (e) => {
-    alertasStore.handleAlertaCreada(e)
+    alertasStore.handleAlertaCreada(e as any)
   })
   useRealtimeEvent('alerta.resolved', (e) => {
     alertasStore.handleAlertaResuelta(e)
@@ -114,10 +114,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     })
   })
   useRealtimeEvent('pedido.estado-cambiado', (e) => {
-    pedidosStore.handleEstadoCambiado(e)
+    pedidosStore.handleEstadoCambiado(e as any)
   })
   useRealtimeEvent('entrega-item.cambiado', (e) => {
-    pedidosStore.handleEntregaItemCambiado(e)
+    pedidosStore.handleEntregaItemCambiado(e as any)
   })
   useRealtimeEvent('devolucion.creada', (e) => {
     const currentBodegaId = bodegaActivaStore.getSnapshot().bodegaId ?? undefined
@@ -128,7 +128,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     })
   })
   useRealtimeEvent('devolucion.cambiada', (e) => {
-    devolucionesStore.handleDevolucionCambiada(e)
+    devolucionesStore.handleDevolucionCambiada(e as any)
   })
 
   return (

@@ -684,7 +684,7 @@ function ModuloAccionesGrid({
   onToggleTodo,
 }: {
   moduloKey: string
-  acciones: string[]
+  acciones: readonly string[]
   selected: Set<Permiso>
   onToggle: (p: Permiso) => void
   allOn: boolean
@@ -710,7 +710,7 @@ function ModuloAccionesGrid({
               style={{ borderRadius: '0.25rem' }}
             >
               {has && <Check size={12} className="inline mr-1 -mt-0.5" />}
-              {ACCION_LABELS[a]}
+              {ACCION_LABELS[a as keyof typeof ACCION_LABELS] ?? a}
             </button>
           )
         })}

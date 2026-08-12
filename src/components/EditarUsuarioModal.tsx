@@ -959,7 +959,7 @@ function ModuloAccionesGridMovil({
   singleAction,
 }: {
   moduloKey: string
-  acciones: string[]
+  acciones: readonly string[]
   permisos: PermisoEstado
   basePerms: Set<string>
   onToggle: (p: Permiso) => void
@@ -1003,7 +1003,7 @@ function ModuloAccionesGridMovil({
               style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
             >
               {has && <Check size={12} />}
-              {ACCION_LABELS[a as Accion] ?? a}
+              {ACCION_LABELS[a as keyof typeof ACCION_LABELS] ?? a}
             </button>
           )
         })}

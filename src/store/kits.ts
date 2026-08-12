@@ -43,6 +43,7 @@ export type Kit = {
   descripcion: string | null
   bodegaId: string
   activo: boolean
+  createdAt: string
   items: KitItem[]
   /** Calculado por el back en listar(): estado del kit según stock. */
   disponibilidad?: {

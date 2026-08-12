@@ -31,7 +31,7 @@ import { Pagination } from './Pagination'
 import { PageHeader } from './PageHeader'
 import { SelectMobile } from './SelectMobile'
 import { imageUrl } from '../lib/apiBase'
-import { useProductos, productosStore, type ProductoListItem } from '../store/productos'
+import { useProductos, productosStore, type Producto, type ProductoListItem } from '../store/productos'
 import { useKits, kitsStore, type Kit } from '../store/kits'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
@@ -76,7 +76,12 @@ export function InventarioV2() {
   const [openKits, setOpenKits] = useState<Record<string, boolean>>({})
   const [openNuevo, setOpenNuevo] = useState(false)
   const [openKit, setOpenKit] = useState(false)
-  const [productoDetalle, setProductoDetalle] = useState<ProductoListItem | null>(null)
+  const [productoDetalle, setProductoDetalle] = useState<Producto | null>(null)
+
+  const abrirProducto = async (producto: ProductoListItem) => {
+    const detalle = await productosStore.findOne(producto.id)
+    setProductoDetalle(detalle)
+  }
   const [prodMenu, setProdMenu] = useState<string | null>(null)
 
   const [page, setPage] = useState(1)
@@ -436,14 +441,14 @@ export function InventarioV2() {
                     estado={estado}
                     c={c}
                     stockPct={stockPct}
-                    onDetalle={() => setProductoDetalle(p)}
+                    onDetalle={() => void abrirProducto(p)}
                     menuOpen={prodMenu === p.id}
                     onMenuToggle={() =>
                       setProdMenu(prodMenu === p.id ? null : p.id)
                     }
                     menuRef={prodMenu === p.id ? menuRef : undefined}
                     onMenuEdit={() => {
-                      setProductoDetalle(p)
+                      void abrirProducto(p)
                       setProdMenu(null)
                     }}
                     onMenuDelete={() => {

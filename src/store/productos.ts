@@ -80,6 +80,7 @@ export type CreateProductoInput = {
   precio?: number
   stockMinimo?: number
   stockMaximo?: number
+  admiteDevolucion?: boolean
   categoriaNombre: string
   marcaId?: string
   unidadMedidaId: string
@@ -98,6 +99,7 @@ export type UpdateProductoInput = {
   precio?: number
   stockMinimo?: number
   stockMaximo?: number
+  admiteDevolucion?: boolean
   categoriaNombre?: string
   marcaId?: string
   unidadMedidaId?: string

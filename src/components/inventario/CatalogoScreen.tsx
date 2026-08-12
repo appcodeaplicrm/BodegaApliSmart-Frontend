@@ -34,7 +34,7 @@ type Item = { id: string; nombre: string; ruc?: string | null }
 
 export type CatalogoConfig = {
   /** Identificador de la pantalla, ej: 'categorias', 'marcas', 'proveedores' */
-  key: 'categorias' | 'marcas' | 'proveedores'
+  key: 'categorias' | 'marcas' | 'proveedores' | 'ubicaciones'
   /** Título que se muestra en el header */
   titulo: string
   /** Endpoint base (sin slash inicial) */
