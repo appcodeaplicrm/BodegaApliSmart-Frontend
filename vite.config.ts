@@ -7,6 +7,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      manifestFilename: 'manifest.json',
+      filename: 'sw-v2.js',
       includeAssets: ['favicon.png', 'pwa-icon-192.png', 'pwa-icon-512.png'],
       manifest: {
         name: 'BodegaApliSmart',
