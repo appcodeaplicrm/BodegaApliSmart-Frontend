@@ -56,6 +56,9 @@ export function imageUrl(urlOrKey: string | null | undefined): string | null {
   if (/^https?:\/\//i.test(urlOrKey)) return urlOrKey
   // data: URLs y blobs no se tocan
   if (urlOrKey.startsWith('data:') || urlOrKey.startsWith('blob:')) return urlOrKey
+  // En producción los assets nuevos pueden pasar por el proxy `/api`,
+  // que reescribe `/api/uploads/*` a `/uploads/*` en el backend.
+  if (urlOrKey.startsWith('/api/uploads/')) return urlOrKey
   const base = apiBaseUrl()
   if (!base) return null
   // Si la key ya viene con `/uploads/`, la respetamos.
