@@ -15,6 +15,7 @@ import { AppLayout } from './components/AppLayout'
 import { RequireAuth } from './components/RequireAuth'
 import { RealtimeProvider } from './components/RealtimeProvider'
 import { ToastBridge } from './components/ToastBridge'
+import { PwaInstallPrompt } from './components/PwaInstallPrompt'
 import { authStore, useAuth } from './store/auth'
 import { bodegasStore } from './store/bodegas'
 import { dashboardStore } from './store/dashboard'
@@ -651,6 +652,7 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AppRoutes />
+        <PwaInstallPrompt />
       </BrowserRouter>
     </ErrorBoundary>
   )
