@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { HeaderNotificationsButton } from './HeaderNotificationsButton'
 
 /**
  * PageHeader — Header estándar para todas las pantallas autenticadas.
@@ -29,20 +30,23 @@ export function PageHeader({ title, subtitle, actions }: Props) {
       <div className="min-w-0">
         <h1
           className="text-2xl uppercase text-foreground leading-none"
-          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
+          style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 500 }}
         >
           {title}
         </h1>
         {subtitle && (
           <div
             className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}
           >
             {subtitle}
           </div>
         )}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      <div className="flex items-center gap-2 shrink-0">
+        {actions}
+        <HeaderNotificationsButton />
+      </div>
     </header>
   )
 }

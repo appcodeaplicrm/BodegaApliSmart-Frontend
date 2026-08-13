@@ -29,6 +29,7 @@ import type { LucideIcon } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useBodegaActiva } from '../../store/bodegaActiva'
 import { Modal } from '../Modal'
+import { PageHeader } from '../PageHeader'
 
 type Item = { id: string; nombre: string; ruc?: string | null }
 
@@ -129,38 +130,24 @@ export function CatalogoScreen({ config }: { config: CatalogoConfig }) {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-4 sm:p-6">
-      {/* ── Header ─────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 bg-primary/15 flex items-center justify-center shrink-0" style={{ borderRadius: '0.25rem' }}>
-            <Icon size={18} className="text-primary" />
-          </div>
-          <div className="min-w-0">
-            <div
-              className="text-[9px] text-muted-foreground uppercase tracking-widest leading-none"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Inventario / {config.titulo}
-            </div>
-            <h1
-              className="text-2xl font-semibold text-foreground leading-tight mt-1"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-            >
-              {config.titulo}
-            </h1>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setModal({ open: true, item: null })}
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 text-xs font-semibold hover:bg-primary/90 transition-colors shrink-0"
-          style={{ borderRadius: '0.25rem' }}
-        >
-          <Plus size={14} />
-          Nueva {config.labelSingular}
-        </button>
-      </div>
+    <div className="flex flex-col h-full min-h-0">
+      <PageHeader
+        title={config.titulo}
+        subtitle="BodegaApliSmart · INVENTARIO"
+        actions={
+          <button
+            type="button"
+            onClick={() => setModal({ open: true, item: null })}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 text-xs font-semibold hover:bg-primary/90 transition-colors shrink-0"
+            style={{ borderRadius: '0.25rem' }}
+          >
+            <Plus size={14} />
+            Nueva {config.labelSingular}
+          </button>
+        }
+      />
+
+      <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-6">
 
       {/* ── Búsqueda ───────────────────────────────────── */}
       <div className="relative mb-3">
@@ -323,6 +310,7 @@ export function CatalogoScreen({ config }: { config: CatalogoConfig }) {
           </div>
         )}
       </Modal>
+      </div>
     </div>
   )
 }

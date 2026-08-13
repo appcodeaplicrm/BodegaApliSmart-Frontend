@@ -449,7 +449,7 @@ function PedidoPDF({ pedido, bodegaNombre, operadorRol }: Props) {
         {/* Header */}
         <View style={s.header}>
           <View style={s.headerLeft}>
-            <Text style={s.brand}>WINERY SMART</Text>
+            <Text style={s.brand}>BodegaApliSmart</Text>
             <Text style={s.titulo}>Detalle de la Solicitud</Text>
           </View>
           <View style={s.headerRight}>
@@ -680,7 +680,7 @@ function PedidoPDF({ pedido, bodegaNombre, operadorRol }: Props) {
 
         {/* Footer */}
         <View style={s.footer} fixed>
-          <Text>WinerySmart</Text>
+          <Text>BodegaApliSmart</Text>
           <Text
             render={({ pageNumber, totalPages }) =>
               `Página ${pageNumber} de ${totalPages}`

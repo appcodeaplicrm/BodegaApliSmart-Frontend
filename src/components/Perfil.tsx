@@ -7,7 +7,6 @@ import {
   Pencil,
   Save,
   X,
-  Camera,
   Eye,
   EyeOff,
   CheckCircle2,
@@ -27,7 +26,11 @@ import {
   Inbox,
 } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
-import { useAuth } from '../store/auth'
+import { authStore, useAuth } from '../store/auth'
+import { FotoPerfil } from './perfil/FotoPerfil'
+import { ConfirmModal } from './ConfirmModal'
+import { HeaderNotificationsButton } from './HeaderNotificationsButton'
+import { useSearchParams } from 'react-router-dom'
 
 // ───────────────────────────────────────────────────────────────────
 //  Tipos
@@ -45,6 +48,10 @@ type Perfil = {
   rolNombre: string
   bodega: { id: string; nombre: string } | null
   empresa: { id: string; nombre: string; email: string } | null
+  // Foto/avatar personal del user. Si no tiene, ambos son null y la UI
+  // muestra las iniciales.
+  fotoKey: string | null
+  fotoUrl: string | null
   createdAt: string
   ultimoAcceso: string | null
   estadisticas: { movimientos: number; despachos: number; checklists: number }
@@ -115,7 +122,15 @@ const NOTIF_GRUPOS: Array<{ grupo: string; items: Array<{ key: NotifKey; label: 
 
 export function Perfil() {
   const auth = useAuth()
-  const [tab, setTab] = useState<Tab>('info')
+  const [searchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const [tab, setTab] = useState<Tab>(
+    requestedTab === 'notificaciones' ? 'notificaciones' : 'info',
+  )
+
+  useEffect(() => {
+    if (requestedTab === 'notificaciones') setTab('notificaciones')
+  }, [requestedTab])
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-background">
@@ -145,7 +160,7 @@ export function Perfil() {
 
 function PageHeader() {
   return (
-    <header className="h-14 border-b border-border px-6 flex items-center justify-between shrink-0 gap-3">
+    <header className="hidden lg:flex h-14 border-b border-border px-6 items-center justify-between shrink-0 gap-3">
       <div className="min-w-0">
         <h1
           className="text-2xl uppercase text-foreground leading-none"
@@ -157,9 +172,10 @@ function PageHeader() {
           className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1"
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
         >
-          STOCKPRO · CUENTA Y PREFERENCIAS
+          BodegaApliSmart · CUENTA Y PREFERENCIAS
         </div>
       </div>
+      <HeaderNotificationsButton />
     </header>
   )
 }
@@ -172,12 +188,19 @@ function ProfileCard() {
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // La URL de la foto se mantiene sincronizada con lo que el componente
+  // FotoPerfil reporta (para que el avatar del header se actualice sin
+  // re-fetch de /perfil).
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
     api
       .get<Perfil>('/perfil')
-      .then((p) => setPerfil(p))
+      .then((p) => {
+        setPerfil(p)
+        setFotoUrl(p.fotoUrl ?? null)
+      })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Error cargando perfil'))
       .finally(() => setLoading(false))
   }, [])
@@ -191,7 +214,6 @@ function ProfileCard() {
     )
   }
 
-  const initials = getInitials(perfil.nombre)
   const fechaIngreso = new Date(perfil.createdAt).toLocaleDateString('es-CO', {
     day: '2-digit',
     month: 'short',
@@ -219,68 +241,79 @@ function ProfileCard() {
         />
       </div>
 
-      {/* Avatar + cámara */}
-      <div className="px-6 -mt-10 relative">
-        <div className="w-20 h-20 rounded-xl bg-primary border-4 border-card flex items-center justify-center">
-          <span
-            className="text-primary-foreground"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 28 }}
-          >
-            {initials}
-          </span>
+      {/* Avatar + foto editable (centrado, en mobile queda full-width
+          y en desktop se mantiene a la izquierda) */}
+      <div className="px-6 -mt-10 relative flex flex-col md:flex-row md:items-end gap-4 md:gap-6">
+        <div className="shrink-0">
+          <FotoPerfil
+            urlInicial={perfil.fotoUrl ?? null}
+            nombre={perfil.nombre}
+            onChange={(newUrl) => {
+              setFotoUrl(newUrl)
+              authStore.actualizarFoto(newUrl)
+              // Si la foto cambió, sincronizamos el `perfil` local para
+              // que TabInfo (que también lo lee) no muestre datos viejos.
+              setPerfil((p) =>
+                p
+                  ? {
+                      ...p,
+                      fotoUrl: newUrl,
+                      fotoKey: newUrl ? 'updated' : null,
+                    }
+                  : p,
+              )
+            }}
+          />
         </div>
-        <button
-          title="Cambiar foto"
-          className="absolute left-[68px] top-12 w-6 h-6 rounded-full bg-secondary border-2 border-card flex items-center justify-center"
-        >
-          <Camera size={11} className="text-secondary-foreground" strokeWidth={2.5} />
-        </button>
-      </div>
 
-      {/* Info */}
-      <div className="px-6 pt-3 pb-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <h2
-              className="text-3xl uppercase text-foreground leading-none"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-            >
-              {perfil.nombre}
-            </h2>
-            <div className="text-sm text-muted-foreground mt-1.5">
-              {perfil.cargo || 'Sin cargo asignado'}
-            </div>
-
-            {/* Meta-info */}
-            <div className="flex items-center gap-3 mt-3 flex-wrap">
-              {perfil.bodega && (
-                <MetaIcon icon={Warehouse} label={perfil.bodega.nombre} />
-              )}
-              {perfil.empresa && (
-                <MetaIcon icon={Building2} label={perfil.empresa.nombre} />
-              )}
-              <MetaIcon icon={CalendarDays} label={`Ingreso ${fechaIngreso}`} />
-              <span
-                className="text-[9px] px-1.5 py-0.5 bg-primary/15 text-primary border border-primary/20 uppercase"
-                style={{
-                  borderRadius: '0.15rem',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontWeight: 500,
-                }}
+        {/* Info */}
+        <div className="flex-1 min-w-0 pt-3 md:pt-6 pb-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <h2
+                className="text-3xl uppercase text-foreground leading-none"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
               >
-                {perfil.rolNombre}
-              </span>
+                {perfil.nombre}
+              </h2>
+              <div className="text-sm text-muted-foreground mt-1.5">
+                {perfil.cargo || 'Sin cargo asignado'}
+              </div>
+
+              {/* Meta-info */}
+              <div className="flex items-center gap-3 mt-3 flex-wrap">
+                {perfil.bodega && (
+                  <MetaIcon icon={Warehouse} label={perfil.bodega.nombre} />
+                )}
+                {perfil.empresa && (
+                  <MetaIcon icon={Building2} label={perfil.empresa.nombre} />
+                )}
+                <MetaIcon icon={CalendarDays} label={`Ingreso ${fechaIngreso}`} />
+                <span
+                  className="text-[9px] px-1.5 py-0.5 bg-primary/15 text-primary border border-primary/20 uppercase"
+                  style={{
+                    borderRadius: '0.15rem',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 500,
+                  }}
+                >
+                  {perfil.rolNombre}
+                </span>
+              </div>
             </div>
+
+            <PillActivo />
           </div>
 
-          <PillActivo />
-        </div>
-
-        {/* Mini-stats (solo desktop) */}
-        <div className="hidden md:grid grid-cols-3 mt-5" style={{ gap: '1px', background: 'var(--border, #2a2a2a)' }}>
-          <StatCell value={perfil.estadisticas.movimientos} label="Movimientos" />
-          <StatCell value={perfil.estadisticas.despachos} label="Despachos" />
-          <StatCell value={perfil.estadisticas.checklists} label="Checklists" />
+          {/* Mini-stats (solo desktop) */}
+          <div
+            className="hidden md:grid grid-cols-3 mt-5"
+            style={{ gap: '1px', background: 'var(--border, #2a2a2a)' }}
+          >
+            <StatCell value={perfil.estadisticas.movimientos} label="Movimientos" />
+            <StatCell value={perfil.estadisticas.despachos} label="Despachos" />
+            <StatCell value={perfil.estadisticas.checklists} label="Checklists" />
+          </div>
         </div>
       </div>
 
@@ -311,6 +344,9 @@ function ProfileCard() {
           </span>
         </div>
       </div>
+
+      {/* Variable de avatar usada para forzar re-render del img cuando cambia */}
+      {fotoUrl ? null : null}
     </div>
   )
 }
@@ -648,6 +684,8 @@ function TabSeguridad() {
 
   const [sesiones, setSesiones] = useState<SesionItem[]>([])
   const [sesionesLoading, setSesionesLoading] = useState(true)
+  const [sesionACerrar, setSesionACerrar] = useState<string | null>(null)
+  const [confirmCerrarTodas, setConfirmCerrarTodas] = useState(false)
 
   useEffect(() => {
     void cargarSesiones()
@@ -693,23 +731,15 @@ function TabSeguridad() {
   }
 
   async function handleCerrarSesion(id: string) {
-    if (!confirm('¿Cerrar esta sesión?')) return
-    try {
-      await api.delete(`/perfil/sesiones/${id}`)
-      setSesiones((s) => s.filter((x) => x.id !== id))
-    } catch {
-      // silencioso
-    }
+    await api.delete(`/perfil/sesiones/${id}`)
+    setSesiones((s) => s.filter((x) => x.id !== id))
+    setSesionACerrar(null)
   }
 
   async function handleCerrarTodas() {
-    if (!confirm('¿Cerrar todas las demás sesiones?')) return
-    try {
-      await api.delete('/perfil/sesiones')
-      await cargarSesiones()
-    } catch {
-      // silencioso
-    }
+    await api.delete('/perfil/sesiones')
+    await cargarSesiones()
+    setConfirmCerrarTodas(false)
   }
 
   return (
@@ -899,7 +929,7 @@ function TabSeguridad() {
             </div>
           </div>
           <button
-            onClick={handleCerrarTodas}
+            onClick={() => setConfirmCerrarTodas(true)}
             className="text-xs text-primary hover:underline"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
@@ -942,7 +972,7 @@ function TabSeguridad() {
                     </span>
                   ) : (
                     <button
-                      onClick={() => handleCerrarSesion(s.id)}
+                      onClick={() => setSesionACerrar(s.id)}
                       className="text-xs px-2 py-1 text-primary border border-primary/20 hover:bg-primary/10 transition-colors"
                       style={{ borderRadius: '0.15rem' }}
                     >
@@ -955,6 +985,26 @@ function TabSeguridad() {
           </ul>
         )}
       </div>
+
+      <ConfirmModal
+        open={confirmCerrarTodas}
+        onClose={() => setConfirmCerrarTodas(false)}
+        onConfirm={handleCerrarTodas}
+        title="¿Cerrar las demás sesiones?"
+        description="Se cerrarán todas las sesiones excepto la que estás usando actualmente."
+        confirmLabel="Cerrar sesiones"
+        tone="danger"
+      />
+
+      <ConfirmModal
+        open={sesionACerrar !== null}
+        onClose={() => setSesionACerrar(null)}
+        onConfirm={() => sesionACerrar ? handleCerrarSesion(sesionACerrar) : undefined}
+        title="¿Cerrar esta sesión?"
+        description="Ese dispositivo tendrá que iniciar sesión nuevamente."
+        confirmLabel="Cerrar sesión"
+        tone="danger"
+      />
     </div>
   )
 }

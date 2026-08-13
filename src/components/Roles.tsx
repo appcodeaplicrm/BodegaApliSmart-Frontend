@@ -87,7 +87,7 @@ export function Roles() {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title="Roles y Permisos"
-        subtitle="STOCKPRO · MATRIZ DE PERMISOS"
+        subtitle="BodegaApliSmart · MATRIZ DE PERMISOS"
         actions={
           <button
             onClick={() => setCreating(true)}

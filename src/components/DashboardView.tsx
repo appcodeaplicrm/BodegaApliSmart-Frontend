@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useDashboard, dashboardStore } from '../store/dashboard'
+import { HeaderNotificationsButton } from './HeaderNotificationsButton'
 
 const COLORS = ['#E8593F', '#ABF768', '#F5F2EC', '#FFB86F', '#9D7EE8', '#5AC8FA']
 
@@ -62,17 +63,17 @@ export function DashboardView() {
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* TOPBAR */}
-      <header className="min-h-14 border-b border-border px-4 sm:px-6 py-3 sm:py-0 sm:flex sm:items-center sm:justify-between shrink-0 gap-3 flex-wrap">
+      <header className="hidden lg:flex min-h-14 border-b border-border px-6 items-center justify-between shrink-0 gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <h1
             className="text-2xl uppercase text-foreground leading-none"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
+            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 500 }}
           >
             Dashboard
           </h1>
           <div
             className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 truncate"
-            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}
           >
             {dashState.status === 'listo'
               ? `${dashState.resumen.bodega.nombre} · RESUMEN GENERAL`
@@ -94,6 +95,7 @@ export function DashboardView() {
             />
             ACTUALIZAR
           </button>
+          <HeaderNotificationsButton />
         </div>
       </header>
 
@@ -522,7 +524,7 @@ function Kpi({
       <div className="flex items-center justify-between">
         <div
           className="text-[10px] text-muted-foreground uppercase tracking-widest"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}
         >
           {label}
         </div>

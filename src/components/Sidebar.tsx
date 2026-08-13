@@ -11,6 +11,7 @@ import { permisosPorBodegaStore } from '../store/permisosPorBodega'
 import { authStore } from '../store/auth'
 import { MODULOS } from '../store/permisos'
 import { permisoDeRuta, primeraRutaPermitida } from '../lib/routing'
+import { imageUrl } from '../lib/apiBase'
 import {
   LayoutDashboard,
   Boxes,
@@ -19,7 +20,6 @@ import {
   ShieldCheck,
   BarChart3,
   // FileText,
-  Bell,
   Settings,
   LogOut,
   Search,
@@ -519,6 +519,7 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
       : null
   const bodegaLabel = bodegaActivaInfo?.nombre ?? '—'
   const initials = getInitials(nombreUsuario)
+  const avatarUrl = imageUrl(usuario?.fotoUrl) ?? usuario?.fotoUrl ?? null
 
   const widthClass = collapsed ? 'w-16' : 'w-60'
 
@@ -572,8 +573,8 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
       <aside
         // En móvil: drawer fijo, oculto por transform.
         // En desktop (lg): relativo, sin transform, ocupa su ancho.
-        className={`${widthClass} shrink-0 bg-card border-r border-border flex flex-col
-          fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+        className={`${widthClass} shrink-0 bg-card border-r border-border flex flex-col overflow-hidden
+          fixed inset-y-0 left-0 z-50 transform transition-[width,transform] duration-300 ease-out will-change-[width,transform]
           lg:relative lg:translate-x-0 lg:z-auto lg:h-dvh
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
@@ -586,7 +587,7 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
       >
       {/* HEADER */}
       <div
-        className={`p-4 border-b border-border ${
+        className={`p-4 border-b border-border transition-[padding,gap] duration-200 ease-out ${
           collapsed ? 'flex flex-col items-center gap-3' : 'flex items-center justify-between'
         }`}
       >
@@ -594,9 +595,9 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
           <div className="flex items-center min-w-0">
             <span
               className="text-foreground text-sm tracking-wider truncate"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 500 }}
             >
-              WINERY SMART
+              BodegaApliSmart
             </span>
           </div>
         )}
@@ -613,30 +614,6 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
           {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={15} />}
         </button>
       </div>
-
-      {/* SEARCH */}
-      {!collapsed && (
-        <div className="p-3 border-b border-border">
-          <div className="relative">
-            <Search
-              size={13}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="w-full pl-8 pr-10 py-2 bg-muted border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
-              style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
-            />
-            <kbd
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground border border-border px-1.5 py-0.5"
-              style={{ borderRadius: '0.15rem', fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              ⌘K
-            </kbd>
-          </div>
-        </div>
-      )}
 
       {/* SCROLL AREA */}
       <nav className="flex-1 overflow-y-auto py-3">
@@ -674,7 +651,7 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
                 <button
                   onClick={() => handleParentClick(item)}
                   title={collapsed ? item.label : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-[color,background-color,padding,gap] duration-200 ease-out ${
                     isOpen && childActive
                       ? 'bg-primary/25 text-white'
                       : isOpen
@@ -804,7 +781,7 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
                     <button
                       onClick={() => irA(item.path)}
                       title={collapsed ? item.label : undefined}
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${isActive ? 'bg-secondary/15 text-secondary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} ${collapsed ? 'justify-center' : ''}`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-[color,background-color,padding,gap] duration-200 ease-out ${isActive ? 'bg-secondary/15 text-secondary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} ${collapsed ? 'justify-center' : ''}`}
                       style={{ borderRadius: '0.25rem' }}
                     >
                       <Icon size={15} className={isActive ? 'text-secondary shrink-0' : 'text-muted-foreground shrink-0'} />
@@ -821,14 +798,10 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
 
       {/* BOTTOM BAR — iconos siempre presentes (4 acciones rápidas) */}
       <div
-        className={`border-t border-border ${
+        className={`border-t border-border transition-[padding,gap] duration-200 ease-out ${
           collapsed ? 'p-2 flex flex-col items-stretch gap-1' : 'p-3 flex items-center gap-1'
         }`}
       >
-        <IconBtn label="Notificaciones" collapsed={collapsed}>
-          <Bell size={collapsed ? 16 : 14} />
-          <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary" />
-        </IconBtn>
         <IconBtn label="Seguridad" collapsed={collapsed} onClick={() => irA('/perfil')}>
           <ShieldIcon size={collapsed ? 16 : 14} />
         </IconBtn>
@@ -844,7 +817,7 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
           sobre el perfil. Click → abre un modal con buscador + lista
           completa de bodegas accesibles. Ver `MisBodegasButton.tsx`. */}
       <div
-        className={`border-t border-border ${
+        className={`border-t border-border transition-[padding] duration-200 ease-out ${
           collapsed ? 'p-2' : 'p-3'
         }`}
       >
@@ -863,13 +836,19 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
           style={{ borderRadius: '0.25rem' }}
         >
           <div
-            className={`w-8 h-8 flex items-center justify-center shrink-0 ${
+            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${
               esSuperadmin
                 ? 'bg-secondary/20 border border-secondary/30'
                 : 'bg-primary/20 border border-primary/30'
             }`}
           >
-            {esSuperadmin ? (
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={`Foto de ${nombreUsuario}`}
+                className="w-full h-full object-cover"
+              />
+            ) : esSuperadmin ? (
               <Crown size={14} className="text-secondary" />
             ) : (
               <span

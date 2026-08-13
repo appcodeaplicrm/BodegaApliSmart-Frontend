@@ -11,7 +11,7 @@ export function SubmoduloView({ sub }: SubmoduloViewProps) {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title={sub.label}
-        subtitle="STOCKPRO · TÉCNICOS"
+        subtitle="BodegaApliSmart · TÉCNICOS"
         actions={
           <button
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"

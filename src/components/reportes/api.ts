@@ -12,7 +12,7 @@
  *  - `bodegaId` se toma del `bodegaActivaStore`. Si no hay bodega activa,
  *    los endpoints devuelven 400 con mensaje claro.
  */
-import { apiBaseUrl } from '../../lib/apiBase'
+import { api } from '../../lib/api'
 import { bodegaActivaStore } from '../../store/bodegaActiva'
 
 // ─── tipos compartidos ────────────────────────────────────────────────
@@ -150,15 +150,10 @@ async function http<T>(path: string, params: Record<string, string | number | un
   // `X-Bodega-Id` por compatibilidad) para que el back no rebote con
   // 400 "Tienes varias bodegas".
   const bodegaId = bodegaActivaStore.getId() ?? undefined
-  const res = await fetch(`${apiBaseUrl()}${path}?${qs({ ...params, bodegaId })}`, {
-    credentials: 'include',
+  const query = qs({ ...params, bodegaId })
+  return api.get<T>(`${path}?${query}`, {
     headers: bodegaId ? { 'X-Bodega-Id': bodegaId } : {},
   })
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
-    throw new Error(txt || `HTTP ${res.status} al pedir ${path}`)
-  }
-  return (await res.json()) as T
 }
 
 // ─── API pública ──────────────────────────────────────────────────────

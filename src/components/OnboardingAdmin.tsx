@@ -70,7 +70,7 @@ export function OnboardingAdmin() {
             className="text-foreground text-2xl tracking-wider"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
           >
-            WINERY SMART
+            BodegaApliSmart
           </div>
         </div>
 
@@ -118,7 +118,7 @@ export function OnboardingAdmin() {
               className="text-foreground text-2xl tracking-wider mb-4"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
             >
-              WINERY SMART
+              BodegaApliSmart
             </div>
             <div className="inline-flex w-12 h-12 bg-primary/15 items-center justify-center mb-3">
               <Warehouse size={20} className="text-primary" />

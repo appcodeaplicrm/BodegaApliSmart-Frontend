@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { Sidebar } from './Sidebar'
+import { HeaderNotificationsButton } from './HeaderNotificationsButton'
 
 /**
  * AppLayout — wrapper compartido por todas las vistas autenticadas.
@@ -53,7 +54,7 @@ export function AppLayout({
   }, [mobileOpen])
 
   return (
-    <div className="h-dvh bg-background text-foreground flex overflow-hidden supports-[min-height:100dvh]:min-h-dvh">
+    <div className="authenticated-app h-dvh bg-background text-foreground flex overflow-hidden supports-[min-height:100dvh]:min-h-dvh">
       <Sidebar
         active={active}
         subKey={subKey}
@@ -85,6 +86,9 @@ export function AppLayout({
           >
             {prettyTitle(active, subKey)}
           </span>
+          <div className="ml-auto">
+            <HeaderNotificationsButton />
+          </div>
         </header>
 
         <main className="flex-1 min-w-0 min-h-0 overflow-y-auto">{children}</main>

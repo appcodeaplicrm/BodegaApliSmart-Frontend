@@ -1,6 +1,6 @@
 const footerLinks = {
   producto: ['Funcionalidades', 'Precios', 'Integraciones', 'Roadmap'],
-  empresa: ['Sobre winery smart', 'Casos de éxito', 'Trabaja con nosotros', 'Prensa'],
+  empresa: ['Sobre BodegaApliSmart', 'Casos de éxito', 'Trabaja con nosotros', 'Prensa'],
   recursos: ['Documentación', 'Blog', 'Centro de ayuda', 'Estado del sistema'],
 }
 
@@ -17,7 +17,7 @@ export function Footer() {
               className="text-foreground text-2xl tracking-wider"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
             >
-              WINERY SMART
+              BodegaApliSmart
             </span>
           </div>
 
@@ -52,7 +52,7 @@ export function Footer() {
             className="text-xs text-muted-foreground"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
-            © 2026 winery smart — sistema de gestión de bodega
+            © 2026 BodegaApliSmart — sistema de gestión de bodega
           </p>
           <div
             className="flex items-center gap-4 text-xs text-muted-foreground"

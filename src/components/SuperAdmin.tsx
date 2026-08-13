@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../lib/api'
+import { HeaderNotificationsButton } from './HeaderNotificationsButton'
 
 type PlanKey = 'Starter' | 'Pro' | 'Enterprise'
 type EstadoEmpresa = 'activa' | 'trial' | 'suspendida'
@@ -250,7 +251,7 @@ export function SuperAdminPlaceholder({ type }: { type: 'metricas' | 'sistema' }
 }
 
 function SuperAdminShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return <div className="h-full flex flex-col min-w-0"><header className="min-h-14 border-b border-border px-6 py-3 flex items-center gap-3 shrink-0"><div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-secondary/10 border border-secondary/20"><Crown size={11} className="text-secondary"/><span className="text-secondary font-mono text-[9px]">SUPER ADMIN</span></div><div><h1 className="text-2xl uppercase leading-none font-heading font-black">{title}</h1><div className="eyebrow mt-1">{subtitle}</div></div></header><div className="flex-1 overflow-y-auto p-6 space-y-5">{children}</div></div>
+  return <div className="h-full flex flex-col min-w-0"><header className="hidden lg:flex min-h-14 border-b border-border px-6 py-3 items-center gap-3 shrink-0"><div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-secondary/10 border border-secondary/20"><Crown size={11} className="text-secondary"/><span className="text-secondary font-mono text-[9px]">SUPER ADMIN</span></div><div><h1 className="text-2xl uppercase leading-none font-heading font-black">{title}</h1><div className="eyebrow mt-1">{subtitle}</div></div><div className="ml-auto"><HeaderNotificationsButton /></div></header><div className="flex-1 overflow-y-auto p-6 space-y-5">{children}</div></div>
 }
 
 function Kpi({ icon: Icon, label, value, sub, accent }: { icon: typeof Building2; label: string; value: string; sub: string; accent?: boolean }) { return <div className={`relative bg-card border p-4 overflow-hidden ${accent ? 'border-secondary/30 bg-secondary/5' : 'border-border'}`}>{accent && <span className="absolute left-0 top-0 h-full w-0.5 bg-secondary"/>}<div className="flex justify-between"><div className="eyebrow">{label}</div><Icon size={14} className={accent ? 'text-secondary' : 'text-muted-foreground'}/></div><div className="text-3xl font-heading font-black mt-2">{value}</div><div className="text-[10px] text-muted-foreground mt-1">{sub}</div></div> }

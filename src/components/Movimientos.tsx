@@ -129,7 +129,7 @@ export function Movimientos() {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title="Movimientos"
-        subtitle="STOCKPRO · ENTRADAS, SALIDAS Y AJUSTES"
+        subtitle="BodegaApliSmart · ENTRADAS, SALIDAS Y AJUSTES"
         actions={
           <div className="flex items-center gap-2">
             <button

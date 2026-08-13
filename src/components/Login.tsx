@@ -132,7 +132,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
               className="text-foreground text-2xl tracking-wider"
               style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
             >
-              WINERY SMART
+              BodegaApliSmart
             </span>
           </div>
         </div>
@@ -174,7 +174,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
             className="text-foreground text-2xl tracking-wider"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
           >
-            WINERY SMART
+            BodegaApliSmart
           </span>
         </div>
 

@@ -138,7 +138,7 @@ export function Usuarios() {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title="Gestión de Usuarios"
-        subtitle="STOCKPRO · ROLES Y PERMISOS"
+        subtitle="BodegaApliSmart · ROLES Y PERMISOS"
         actions={
           <button
             onClick={() => setCreating(true)}

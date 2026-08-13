@@ -56,7 +56,7 @@ export function TecnicosIndex() {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title="Técnicos"
-        subtitle="STOCKPRO · SUB-MÓDULOS DISPONIBLES"
+        subtitle="BodegaApliSmart · SUB-MÓDULOS DISPONIBLES"
       />
 
       <div className="flex-1 overflow-y-auto p-8 space-y-6">

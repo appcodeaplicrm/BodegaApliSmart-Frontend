@@ -105,8 +105,8 @@ export function ChecklistView() {
         title="Checklist"
         subtitle={
           perms.canManage
-            ? 'STOCKPRO · TÉCNICOS'
-            : 'STOCKPRO · TÉCNICOS · SOLO CONSULTA'
+            ? 'BodegaApliSmart · TÉCNICOS'
+            : 'BodegaApliSmart · TÉCNICOS · SOLO CONSULTA'
         }
         actions={
           perms.canCreate ? (
@@ -268,7 +268,7 @@ export function ChecklistView() {
 function SinBodegaActiva() {
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
-      <PageHeader title="Checklist" subtitle="STOCKPRO · TÉCNICOS" />
+      <PageHeader title="Checklist" subtitle="BodegaApliSmart · TÉCNICOS" />
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
         <Building2 size={32} className="text-muted-foreground mb-3" />
         <h3

@@ -13,6 +13,7 @@ export type UsuarioActivo = {
   rolNombre?: string
   bodegas: string[]
   bodegaId: string | null
+  fotoUrl?: string | null
 }
 
 /** Permiso con la forma "modulo.accion" (ej: "inventario.ver", "ordenes.crear") */
@@ -131,6 +132,18 @@ export const authStore = {
         ...estado.sesion,
         permisos,
         modulePermissions,
+      },
+    })
+  },
+
+  /** Actualiza el avatar de la sesión sin volver a consultar /auth/me. */
+  actualizarFoto(fotoUrl: string | null) {
+    if (estado.status !== 'autenticado') return
+    setEstado({
+      status: 'autenticado',
+      sesion: {
+        ...estado.sesion,
+        usuario: { ...estado.sesion.usuario, fotoUrl },
       },
     })
   },

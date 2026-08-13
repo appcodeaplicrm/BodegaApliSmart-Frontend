@@ -32,7 +32,7 @@ export function Hero() {
               className="mt-4 sm:mt-3 text-base text-muted-foreground max-w-md leading-relaxed"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
-              stockpro centraliza entradas, salidas, picking e inventario en una sola plataforma
+              BodegaApliSmart centraliza entradas, salidas, picking e inventario en una sola plataforma
               diseñada para operaciones de logística y supply chain en latinoamérica.
             </p>
 

@@ -227,7 +227,7 @@ export function InventarioV2() {
     <div className="flex flex-col h-full">
       <PageHeader
         title="Inventario"
-        subtitle="STOCKPRO · PANEL CENTRAL"
+        subtitle="BodegaApliSmart · PANEL CENTRAL"
       />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 sm:space-y-8">

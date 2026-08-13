@@ -62,7 +62,7 @@ export function Alertas() {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title="Alertas"
-        subtitle="STOCKPRO · STOCK BAJO Y SIN STOCK"
+        subtitle="BodegaApliSmart · STOCK BAJO Y SIN STOCK"
         actions={
           <button
             type="button"

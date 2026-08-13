@@ -163,7 +163,7 @@ export function Ordenes() {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title="Mis Solicitudes"
-        subtitle={`STOCKPRO · ${usuarioRol.toUpperCase()}`}
+        subtitle={`BodegaApliSmart · ${usuarioRol.toUpperCase()}`}
         actions={
           <button
             onClick={() => setOpen(true)}

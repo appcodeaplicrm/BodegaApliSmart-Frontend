@@ -14,9 +14,21 @@ body {
   font-family: 'DM Sans', system-ui, sans-serif;
 }
 
+/* Los títulos deben conservar una jerarquía clara sin usar pesos gruesos.
+   Esta regla no afecta cifras, métricas ni valores renderizados en div/span. */
+.authenticated-app h1,
+.authenticated-app h2,
+.authenticated-app h3,
+.authenticated-app h4,
+.authenticated-app h5,
+.authenticated-app h6 {
+  font-weight: 500 !important;
+}
+
 @layer components {
   .font-heading { font-family: 'Barlow Condensed', sans-serif; }
   .eyebrow { @apply text-[9px] uppercase tracking-widest text-muted-foreground font-mono; }
+  .authenticated-app .eyebrow { @apply font-medium; }
   .control { @apply w-full bg-muted border border-border px-3 py-2 text-xs text-foreground outline-none transition-colors focus:border-secondary/50; border-radius: 0.25rem; }
   .btn-primary { @apply inline-flex items-center gap-2 bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90; border-radius: 0.25rem; }
   .btn-outline { @apply inline-flex items-center gap-2 border border-border px-3 py-2 text-xs text-foreground transition-colors hover:border-foreground/30; border-radius: 0.25rem; }

@@ -100,7 +100,7 @@ export function Reportes({ subKey }: { subKey: string }) {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
-      <PageHeader title={sub.label} subtitle="STOCKPRO · REPORTES" />
+      <PageHeader title={sub.label} subtitle="BodegaApliSmart · REPORTES" />
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
         {sub.key === 'resumen' && <ResumenView />}
         {sub.key === 'entradas' && <EntradasSalidasView tipo="entradas" />}
@@ -1025,7 +1025,7 @@ export function ReportesIndex() {
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <PageHeader
         title="Reportes"
-        subtitle="STOCKPRO · REPORTES DISPONIBLES"
+        subtitle="BodegaApliSmart · REPORTES DISPONIBLES"
       />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
