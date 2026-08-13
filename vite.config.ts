@@ -1,8 +1,57 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.png'],
+      manifest: {
+        name: 'BodegaApliSmart',
+        short_name: 'BodegaApliSmart',
+        description: 'Sistema de gestión de bodegas, inventario y operaciones.',
+        lang: 'es',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        background_color: '#242424',
+        theme_color: '#242424',
+        icons: [
+          {
+            src: '/favicon.png',
+            sizes: '1254x1254',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/favicon.png',
+            sizes: '1254x1254',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//, /^\/uploads\//],
+        runtimeCaching: [
+          {
+            urlPattern: /\/(?:api\/|socket\.io\/|uploads\/)/,
+            handler: 'NetworkOnly',
+          },
+        ],
+      },
+      devOptions: {
+        enabled: false,
+      },
+    }),
+  ],
   server: {
     port: 5173,
     proxy: {
