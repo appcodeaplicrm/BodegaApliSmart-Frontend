@@ -245,8 +245,7 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                 className="p-2 bg-muted border border-border"
                 style={{ borderRadius: '0.25rem' }}
               >
-                {/* Fila 1: número + toggle + input cantidad + trash */}
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_5rem_2.75rem] items-center gap-2 sm:grid-cols-[1.25rem_auto_minmax(0,1fr)_5rem_2.75rem]">
                   <span
                     className="text-[10px] text-muted-foreground w-5 shrink-0"
                     style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -294,24 +293,21 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                     min={1}
                     value={it.cantidad}
                     onChange={(e) => setItem(it.uid, { cantidad: Number(e.target.value) })}
-                    className="w-20 min-h-[44px] px-2 py-1.5 bg-background border border-border text-sm text-foreground text-center outline-none focus:border-primary/60"
+                    className="col-start-3 row-start-1 min-h-[44px] w-20 border border-border bg-background px-2 py-1.5 text-center text-sm text-foreground outline-none focus:border-primary/60 sm:col-start-4"
                     style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
                   />
                   <button
                     type="button"
                     onClick={() => removeItem(it.uid)}
                     disabled={items.length === 1}
-                    className="min-w-[44px] min-h-[44px] p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center"
+                    className="col-start-4 row-start-1 inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-1.5 text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 sm:col-start-5"
                     aria-label="Eliminar ítem"
                   >
                     <Trash2 size={14} />
                   </button>
-                </div>
-
-                {/* Fila 2: selector (full-width). En mobile baja a una línea
-                    completa para que el botón custom del SelectMobile tenga
-                    todo el ancho del row. */}
-                <div className="mt-2">
+                {/* En móvil el selector ocupa la segunda fila completa.
+                    En PC se ubica entre el tipo de recurso y la cantidad. */}
+                <div className="col-span-4 col-start-1 row-start-2 min-w-0 sm:col-span-1 sm:col-start-3 sm:row-start-1">
                   {it.kind === 'producto' ? (
                     <SelectMobile
                       value={it.productoId}
@@ -322,6 +318,7 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                       }
                       disabled={productosLoading}
                       label="Producto"
+                      className="w-full"
                     />
                   ) : (
                     <SelectMobile
@@ -334,8 +331,10 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                       placeholder={kitsLoading ? 'Cargando kits…' : 'Seleccionar kit…'}
                       disabled={kitsLoading}
                       label="Kit"
+                      className="w-full"
                     />
                   )}
+                </div>
                 </div>
 
                 {/* Si es kit, mostramos el desglose de productos que tiene */}

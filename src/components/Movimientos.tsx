@@ -28,7 +28,9 @@ import { PageHeader } from './PageHeader'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
 import { api } from '../lib/api'
-import { Modal } from './checklist/Modal'
+import { Modal } from './Modal'
+import { Modal as LegacyModal } from './checklist/Modal'
+import { SelectMobile } from './SelectMobile'
 import { imageUrl } from '../lib/apiBase'
 import { comprasStore, type CompraDetalle } from '../store/compras'
 import { Eye, FileText, Image as ImageIcon } from 'lucide-react'
@@ -158,6 +160,32 @@ export function Movimientos() {
           </div>
         }
       />
+
+      <div className="flex items-center gap-2 border-b border-border px-6 py-3 lg:hidden">
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={movState.status === 'cargando' || !activaId}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-border text-foreground transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ borderRadius: '0.25rem' }}
+          aria-label="Refrescar movimientos"
+        >
+          <RefreshCcw
+            size={14}
+            className={movState.status === 'cargando' ? 'animate-spin' : ''}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpenNuevo(true)}
+          disabled={!activaId || !puedeEditar}
+          className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-2 bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <Plus size={14} />
+          Nuevo Movimiento
+        </button>
+      </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="space-y-6">
@@ -457,45 +485,20 @@ function NuevoMovimientoModal({ bodegaId, productos, onClose, onCreated }: Modal
   const esCompra = tipoMovimientoNombre === 'Compra'
 
   return (
-    <Modal zIndex={100} full>
-      <div
-        className="bg-card border border-border w-full max-w-2xl flex flex-col"
-        style={{ borderRadius: '0.25rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary/15 flex items-center justify-center">
-              <Plus size={18} className="text-primary" />
-            </div>
-            <div>
-              <h2
-                className="text-xl uppercase text-foreground leading-none"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-              >
-                {esCompra ? 'Nueva Compra' : 'Nuevo Movimiento'}
-              </h2>
-              <p
-                className="mt-1 text-xs text-muted-foreground"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
-                {esCompra
-                  ? 'Ingresá productos con proveedor, factura y fotos de evidencia'
-                  : 'Registrá una entrada, salida o ajuste'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Cerrar"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+    <Modal
+      open
+      onClose={onClose}
+      title={esCompra ? 'Nueva Compra' : 'Nuevo Movimiento'}
+      description={
+        esCompra
+          ? 'Ingresá productos con proveedor, factura y fotos de evidencia'
+          : 'Registrá una entrada, salida o ajuste'
+      }
+      icon={<Plus size={18} className="text-primary" />}
+      size="lg"
+      dismissOnOverlay={false}
+    >
+        <div className="space-y-4 p-4 sm:p-5">
           {/* Selector de tipo va PRIMERO (siempre visible) */}
           <div>
             <label
@@ -546,7 +549,6 @@ function NuevoMovimientoModal({ bodegaId, productos, onClose, onCreated }: Modal
             />
           )}
         </div>
-      </div>
     </Modal>
   )
 }
@@ -659,6 +661,7 @@ function MovimientoSimpleForm({
   return (
     <>
       <form
+        id="movimiento-simple-form"
         onSubmit={(e) => {
           e.preventDefault()
           void handleSubmit()
@@ -672,20 +675,18 @@ function MovimientoSimpleForm({
           >
             Producto *
           </label>
-          <select
+          <SelectMobile
             value={productoId}
-            onChange={(e) => setProductoId(e.target.value)}
+            onChange={setProductoId}
+            options={productos.map((p) => ({
+              value: p.id,
+              label: `${p.nombre} (${p.codigo}) · ${p.unidadMedida.abreviatura}`,
+            }))}
+            placeholder="Elegí un producto…"
+            label="Seleccionar producto"
+            aria-label="Producto"
             className={inputClass}
-          >
-            <option value="" disabled>
-              Elegí un producto…
-            </option>
-            {productos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre} ({p.codigo}) · {p.unidadMedida.abreviatura}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
         <div>
@@ -695,7 +696,7 @@ function MovimientoSimpleForm({
           >
             Cantidad *
           </label>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(5.5rem,0.55fr)] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
             <input
               type="number"
               min={0}
@@ -710,7 +711,7 @@ function MovimientoSimpleForm({
               <select
                 value={unidadId}
                 onChange={(e) => setUnidadId(e.target.value)}
-                className={`${inputClass} w-36`}
+                className={inputClass}
                 title="Unidad en la que cargás la cantidad"
               >
                 {unidadesDisponibles.map((u) => (
@@ -721,7 +722,7 @@ function MovimientoSimpleForm({
               </select>
             ) : productoSel ? (
               <div
-                className="w-36 px-3 py-2.5 bg-muted border border-border text-sm text-foreground flex items-center justify-between"
+                className="flex min-w-0 items-center justify-between border border-border bg-muted px-3 py-2.5 text-sm text-foreground"
                 style={{ borderRadius: '0.25rem' }}
                 title="La unidad base del producto"
               >
@@ -740,7 +741,7 @@ function MovimientoSimpleForm({
               </div>
             ) : (
               <div
-                className="w-36 px-3 py-2.5 bg-muted border border-border text-sm text-muted-foreground"
+                className="min-w-0 border border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground"
                 style={{ borderRadius: '0.25rem' }}
               >
                 —
@@ -792,24 +793,21 @@ function MovimientoSimpleForm({
         )}
       </form>
 
-      <div className="p-4 border-t border-border flex items-center gap-3 shrink-0">
+      <div className="sticky bottom-0 z-10 -mx-4 -mb-4 grid grid-cols-2 gap-2 border-t border-border bg-card p-4 sm:-mx-5 sm:-mb-5 sm:gap-3">
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
+          className="inline-flex min-w-0 items-center justify-center gap-2 border border-border py-2.5 text-xs text-foreground transition-colors hover:border-foreground/30 sm:text-sm"
           style={{ borderRadius: '0.25rem' }}
         >
           <X size={14} />
           Cancelar
         </button>
         <button
-          type="button"
-          onClick={() => {
-            const f = (document.querySelector('form') as HTMLFormElement | null)
-            f?.requestSubmit()
-          }}
+          type="submit"
+          form="movimiento-simple-form"
           disabled={submitting}
-          className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="inline-flex min-w-0 items-center justify-center gap-2 bg-primary py-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
           style={{ borderRadius: '0.25rem' }}
         >
           {submitting ? (
@@ -1104,6 +1102,7 @@ function CompraForm({
   return (
     <>
       <form
+        id="movimiento-compra-form"
         onSubmit={(e) => {
           e.preventDefault()
           void handleSubmit()
@@ -1133,19 +1132,20 @@ function CompraForm({
                 Proveedor (opcional)
               </label>
               <div className="flex gap-2">
-                <select
+                <SelectMobile
                   value={proveedorId}
-                  onChange={(e) => setProveedorId(e.target.value)}
+                  onChange={setProveedorId}
+                  options={[
+                    { value: '', label: 'Sin proveedor…' },
+                    ...proveedores.map((p) => ({
+                      value: p.id,
+                      label: `${p.nombre}${p.ruc ? ` · ${p.ruc}` : ''}`,
+                    })),
+                  ]}
+                  label="Seleccionar proveedor"
+                  aria-label="Proveedor"
                   className="flex-1 px-3 py-2.5 bg-muted border border-border text-sm text-foreground"
-                  style={{ borderRadius: '0.25rem' }}
-                >
-                  <option value="">Sin proveedor…</option>
-                  {proveedores.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre} {p.ruc ? `· ${p.ruc}` : ''}
-                    </option>
-                  ))}
-                </select>
+                />
                 <button
                   type="button"
                   onClick={() => setShowNuevoProveedor((s) => !s)}
@@ -1220,7 +1220,7 @@ function CompraForm({
 
         {/* Carrito de items */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <span
                 className="text-[10px] uppercase tracking-widest text-muted-foreground"
@@ -1240,7 +1240,7 @@ function CompraForm({
             <button
               type="button"
               onClick={agregarItem}
-              className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors text-sm"
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 border border-border bg-muted px-3 py-2 text-sm text-foreground transition-colors hover:border-primary/40 hover:text-primary sm:w-auto"
               style={{ borderRadius: '0.25rem' }}
             >
               <Plus size={14} />
@@ -1292,23 +1292,20 @@ function CompraForm({
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="grid grid-cols-12 gap-2">
                           <div className="col-span-12 md:col-span-6">
-                            <select
+                            <SelectMobile
                               value={it.productoId}
-                              onChange={(e) => onProductoChange(it.id, e.target.value)}
+                              onChange={(value) => void onProductoChange(it.id, value)}
+                              options={productos.map((p) => ({
+                                value: p.id,
+                                label: `${p.nombre} (${p.codigo}) · ${p.unidadMedida.abreviatura}`,
+                              }))}
+                              placeholder="Elegí un producto…"
+                              label={`Seleccionar producto ${idx + 1}`}
+                              aria-label={`Producto ${idx + 1}`}
                               className="w-full px-3 py-2.5 bg-muted border border-border text-sm text-foreground"
-                              style={{ borderRadius: '0.25rem' }}
-                            >
-                              <option value="" disabled>
-                                Elegí un producto…
-                              </option>
-                              {productos.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.nombre} ({p.codigo}) · {p.unidadMedida.abreviatura}
-                                </option>
-                              ))}
-                            </select>
+                            />
                           </div>
-                          <div className="col-span-5 md:col-span-2">
+                          <div className="col-span-6 md:col-span-2">
                             <input
                               type="number"
                               min={0}
@@ -1325,7 +1322,7 @@ function CompraForm({
                               disabled={!prod}
                             />
                           </div>
-                          <div className="col-span-5 md:col-span-2">
+                          <div className="col-span-6 md:col-span-2">
                             <select
                               value={it.unidadMedidaId}
                               onChange={(e) =>
@@ -1342,7 +1339,7 @@ function CompraForm({
                               ))}
                             </select>
                           </div>
-                          <div className="col-span-2 md:col-span-2">
+                          <div className="col-span-12 md:col-span-2">
                             <input
                               type="number"
                               min={0}
@@ -1394,7 +1391,7 @@ function CompraForm({
 
         {/* Fotos de la factura */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Receipt size={13} className="text-primary" />
               <span
@@ -1415,7 +1412,7 @@ function CompraForm({
             <button
               type="button"
               onClick={() => facturaFileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 border border-border bg-muted text-foreground hover:border-primary/40 hover:text-primary transition-colors text-sm"
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 border border-border bg-muted px-3 py-2 text-sm text-foreground transition-colors hover:border-primary/40 hover:text-primary sm:w-auto"
               style={{ borderRadius: '0.25rem' }}
             >
               <Camera size={14} />
@@ -1469,25 +1466,22 @@ function CompraForm({
         )}
       </form>
 
-      <div className="p-4 border-t border-border flex items-center gap-3 shrink-0">
+      <div className="sticky bottom-0 z-10 -mx-4 -mb-4 grid grid-cols-2 gap-2 border-t border-border bg-card p-4 sm:-mx-5 sm:-mb-5 sm:gap-3">
         <button
           type="button"
           onClick={onClose}
           disabled={submitting}
-          className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 border border-border text-sm text-foreground hover:border-foreground/30 transition-colors"
+          className="inline-flex min-w-0 items-center justify-center gap-2 border border-border py-2.5 text-xs text-foreground transition-colors hover:border-foreground/30 sm:text-sm"
           style={{ borderRadius: '0.25rem' }}
         >
           <X size={14} />
           Cancelar
         </button>
         <button
-          type="button"
-          onClick={() => {
-            const f = (document.querySelector('form') as HTMLFormElement | null)
-            f?.requestSubmit()
-          }}
+          type="submit"
+          form="movimiento-compra-form"
           disabled={submitting || items.length === 0}
-          className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="inline-flex min-w-0 items-center justify-center gap-2 bg-primary px-2 py-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
           style={{ borderRadius: '0.25rem' }}
         >
           {submitting ? (
@@ -1596,7 +1590,7 @@ function MovimientoDetalleModal({ m, onClose }: { m: Movimiento; onClose: () => 
   const compraId = m.compra?.id ?? null
 
   return (
-    <Modal zIndex={100} full>
+    <LegacyModal zIndex={100} full>
       <div
         className="bg-card border border-border w-full sm:max-w-3xl flex flex-col sm:my-auto sm:max-h-[90vh] sm:mx-4 sm:my-4"
         style={{ borderRadius: '0.25rem' }}
@@ -1622,7 +1616,7 @@ function MovimientoDetalleModal({ m, onClose }: { m: Movimiento; onClose: () => 
           </button>
         </div>
       </div>
-    </Modal>
+    </LegacyModal>
   )
 }
 

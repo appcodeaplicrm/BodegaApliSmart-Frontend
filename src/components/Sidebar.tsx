@@ -595,7 +595,7 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
           <div className="flex items-center min-w-0">
             <span
               className="text-foreground text-sm tracking-wider truncate"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 500 }}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 200 }}
             >
               BodegaApliSmart
             </span>

@@ -485,7 +485,6 @@ function DashboardContenido() {
             {r.bodega.direccion ? ` · ${r.bodega.direccion}` : ''}
           </span>
         </div>
-        <span>Datos en vivo del backend</span>
       </div>
     </>
   )

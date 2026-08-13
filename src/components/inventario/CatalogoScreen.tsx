@@ -55,6 +55,7 @@ export type CatalogoConfig = {
 export function CatalogoScreen({ config }: { config: CatalogoConfig }) {
   const Icon = config.icon
   const bodegaId = useBodegaActiva()
+  const nuevoLabel = `${config.key === 'proveedores' ? 'Nuevo' : 'Nueva'} ${config.labelSingular}`
 
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
@@ -142,10 +143,22 @@ export function CatalogoScreen({ config }: { config: CatalogoConfig }) {
             style={{ borderRadius: '0.25rem' }}
           >
             <Plus size={14} />
-            Nueva {config.labelSingular}
+            {nuevoLabel}
           </button>
         }
       />
+
+      <div className="border-b border-border px-4 py-3 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setModal({ open: true, item: null })}
+          className="inline-flex h-9 w-full items-center justify-center gap-2 bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <Plus size={14} />
+          {nuevoLabel}
+        </button>
+      </div>
 
       <div className="flex flex-col flex-1 min-h-0 p-4 sm:p-6">
 

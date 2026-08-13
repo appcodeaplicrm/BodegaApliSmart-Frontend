@@ -80,10 +80,10 @@ export function Alertas() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <KpiCard
             icon={AlertTriangle}
             label="Total activas"
@@ -105,11 +105,10 @@ export function Alertas() {
         </div>
 
         {/* Filtros */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-[auto_repeat(3,minmax(0,1fr))] items-center gap-2 sm:flex sm:flex-wrap">
           <Filter
             size={14}
             className="text-muted-foreground"
-            style={{ marginRight: '4px' }}
           />
           <FilterChip
             label="Todas"
@@ -270,11 +269,11 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-3 py-1.5 border text-xs transition-colors ${colorClass}`}
+      className={`inline-flex min-w-0 items-center justify-center gap-1 border px-2 py-2 text-[10px] transition-colors sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs ${colorClass}`}
       style={{ borderRadius: '0.25rem', fontFamily: "'JetBrains Mono', monospace" }}
     >
       {label}
-      <span className="text-[10px] opacity-70">{count}</span>
+      <span className="shrink-0 text-[9px] opacity-70 sm:text-[10px]">{count}</span>
     </button>
   )
 }

@@ -75,3 +75,23 @@ body {
     margin: 0 0 0.5rem 0 !important;
   }
 }
+@keyframes planEditorIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes planPreviewIn {
+  from { opacity: 0; transform: translateX(32px) scale(0.97); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes planGridIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="planEditorIn"], [class*="planPreviewIn"], [class*="planGridIn"] {
+    animation: none !important;
+  }
+}

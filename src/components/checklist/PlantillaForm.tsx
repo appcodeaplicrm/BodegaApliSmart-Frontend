@@ -214,7 +214,7 @@ export function PlantillaForm({ roles, bodegaId, initial, onCancel, onSaved }: P
       setError('Indica el nombre de la empresa.')
       return
     }
-    if (!objetoNombre.trim()) {
+    if (htmlKind === 'escaleras' && !objetoNombre.trim()) {
       setError('Indica el nombre del objeto a inspeccionar.')
       return
     }
@@ -239,13 +239,18 @@ export function PlantillaForm({ roles, bodegaId, initial, onCancel, onSaved }: P
       empresaNombre: empresaNombre.trim() || undefined,
       empresaDepartamento: empresaDepartamento.trim() || undefined,
       empresaFormato: empresaFormato.trim() || undefined,
-      // PDF objeto
-      objetoNombre: objetoNombre.trim() || undefined,
-      objetoLongitud: objetoLongitud.trim() || undefined,
-      objetoTipos: objetoTipos.length > 0 ? objetoTipos : undefined,
-      objetoCapacidad: objetoCapacidad.trim() || undefined,
-      objetoCodigo: objetoCodigo.trim() || undefined,
-      objetoFotoKey: objetoFotoKey ?? undefined,
+      // El formato EPP trabaja directamente por ítems y no tiene un
+      // objeto principal a inspeccionar.
+      ...(htmlKind === 'escaleras'
+        ? {
+            objetoNombre: objetoNombre.trim() || undefined,
+            objetoLongitud: objetoLongitud.trim() || undefined,
+            objetoTipos: objetoTipos.length > 0 ? objetoTipos : undefined,
+            objetoCapacidad: objetoCapacidad.trim() || undefined,
+            objetoCodigo: objetoCodigo.trim() || undefined,
+            objetoFotoKey: objetoFotoKey ?? undefined,
+          }
+        : {}),
       // Items custom. Cada plantilla puede tener los suyos.
       items: itemsPayload,
     }
@@ -469,7 +474,8 @@ export function PlantillaForm({ roles, bodegaId, initial, onCancel, onSaved }: P
           </Field>
         </Section>
 
-        {/* ─── SECCIÓN 3: OBJETO A INSPECCIONAR (PDF) ─── */}
+        {/* El formato EPP se define por ítems; no existe un objeto principal. */}
+        {htmlKind === 'escaleras' && (
         <Section icon={<Package size={12} />} title="OBJETO A INSPECCIONAR (PDF)">
           <Field label="Nombre del objeto">
             <input
@@ -592,6 +598,7 @@ export function PlantillaForm({ roles, bodegaId, initial, onCancel, onSaved }: P
             </div>
           </Field>
         </Section>
+        )}
 
         {/* ─── SECCIÓN 4: ITEMS A VERIFICAR ─── */}
         <Section icon={<CheckSquare size={12} />} title={`ÍTEMS A VERIFICAR (${items.length})`}>

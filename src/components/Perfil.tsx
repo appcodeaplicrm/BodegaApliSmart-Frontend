@@ -406,7 +406,7 @@ function CardSkeleton() {
 
 function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   return (
-    <div className="inline-flex items-center gap-1 p-1 bg-muted rounded-lg border border-border w-fit">
+    <div className="grid w-full grid-cols-2 gap-1 rounded-lg border border-border bg-muted p-1 sm:inline-flex sm:w-fit sm:items-center">
       <TabButton active={tab === 'info'} onClick={() => setTab('info')}>
         <UserIcon size={13} />
         Mi Perfil
@@ -439,7 +439,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+      className={`inline-flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-xs transition-colors sm:w-auto sm:px-3 sm:py-1.5 ${
         active
           ? 'bg-card text-foreground shadow-sm'
           : 'text-muted-foreground hover:text-foreground'
