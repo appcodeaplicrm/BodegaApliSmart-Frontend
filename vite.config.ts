@@ -12,7 +12,7 @@ export default defineConfig({
       includeAssets: [
         'favicon.png',
         'pwa-icon-192.png',
-        'pwa-icon-512.png',
+        'pwa-icon-maskable-512.png',
         'screenshot-wide.png',
         'screenshot-narrow.png',
       ],
@@ -35,16 +35,10 @@ export default defineConfig({
             purpose: 'any',
           },
           {
-            src: '/pwa-icon-512.png',
+            src: '/pwa-icon-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/pwa-icon-maskable-512.png',
-            sizes: '1024x1024',
-            type: 'image/png',
-            purpose: 'maskable',
+            purpose: 'any maskable',
           },
         ],
         screenshots: [
