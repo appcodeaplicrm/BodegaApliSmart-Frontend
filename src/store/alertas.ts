@@ -10,11 +10,20 @@ export type AlertaStock = {
   atendida: boolean
   createdAt: string
   updatedAt: string
+  cantidadSolicitada: number | null
+  evidenciaPedidoKey: string | null
+  proveedorPedidoId: string | null
+  proveedorPedidoNombre: string | null
+  atendidaAt: string | null
+  atendidaPorId: string | null
   producto: {
     id: string
     nombre: string
     codigo: string
     stockMinimo: number
+    proveedores?: Array<{
+      proveedor: { id: string; nombre: string; ruc: string | null }
+    }>
   }
   bodega: { id: string; nombre: string }
 }
@@ -96,6 +105,14 @@ export const alertasStore = {
     }
   },
 
+  async refetch(bodegaId: string, soloActivas = true): Promise<AlertaStock[]> {
+    const alertas = await api.get<AlertaStock[]>(
+      `/alertas?bodegaId=${encodeURIComponent(bodegaId)}&soloActivas=${soloActivas}`,
+    )
+    setEstado({ status: 'listo', alertas, bodegaId })
+    return alertas
+  },
+
   async atender(id: string, atendida = true): Promise<AlertaStock> {
     const updated = await api.patch<AlertaStock>(
       `/alertas/${encodeURIComponent(id)}`,
@@ -126,6 +143,35 @@ export const alertasStore = {
       }
     }
     return updated
+  },
+
+  async atenderConPedido(
+    id: string,
+    bodegaId: string,
+    cantidadSolicitada: number,
+    evidencia: File,
+  ): Promise<AlertaStock> {
+    const form = new FormData()
+    form.append('cantidadSolicitada', String(cantidadSolicitada))
+    form.append('evidencia', evidencia)
+    const updated = await api.post<AlertaStock>(
+      `/alertas/${encodeURIComponent(id)}/atender?bodegaId=${encodeURIComponent(bodegaId)}`,
+      form,
+    )
+    if (estado.status === 'listo') {
+      setEstado({
+        status: 'listo',
+        bodegaId: estado.bodegaId,
+        alertas: estado.alertas.filter((alerta) => alerta.id !== id),
+      })
+    }
+    return updated
+  },
+
+  async cargarHistorial(bodegaId: string): Promise<AlertaStock[]> {
+    return api.get<AlertaStock[]>(
+      `/alertas/historial?bodegaId=${encodeURIComponent(bodegaId)}`,
+    )
   },
 
   reset() {

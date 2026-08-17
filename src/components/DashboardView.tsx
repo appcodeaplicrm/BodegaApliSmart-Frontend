@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -27,7 +27,7 @@ import {
   Inbox,
 } from 'lucide-react'
 import { useBodegaActiva } from '../store/bodegaActiva'
-import { useDashboard, dashboardStore } from '../store/dashboard'
+import { useDashboard, dashboardStore, type DashboardResumen } from '../store/dashboard'
 import { HeaderNotificationsButton } from './HeaderNotificationsButton'
 
 const COLORS = ['#E8593F', '#ABF768', '#F5F2EC', '#FFB86F', '#9D7EE8', '#5AC8FA']
@@ -57,7 +57,7 @@ export function DashboardView() {
   }, [activaId, status, resumenBodegaId, errorBodegaId])
 
   function handleRefresh() {
-    if (activaId) void dashboardStore.cargar(activaId)
+    if (activaId) void dashboardStore.refetch(activaId)
   }
 
   return (
@@ -177,8 +177,19 @@ function DashboardError({ mensaje, onRetry }: { mensaje: string; onRetry: () => 
 
 function DashboardContenido() {
   const dash = useDashboard()
+  const [vistaValor, setVistaValor] = useState<'dia' | 'mes' | 'anio'>('dia')
   if (dash.status !== 'listo') return null
   const r = dash.resumen
+  const valorSalidas = vistaValor === 'dia'
+    ? (r.valorSalidasPorDia ?? [])
+    : vistaValor === 'mes'
+      ? (r.valorSalidasPorMes ?? [])
+      : (r.valorSalidasPorAnio ?? [])
+  const subtituloValor = vistaValor === 'dia'
+    ? 'Últimos 30 días'
+    : vistaValor === 'mes'
+      ? 'Últimos 12 meses'
+      : 'Últimos 5 años'
 
   return (
     <>
@@ -226,6 +237,63 @@ function DashboardContenido() {
           value={r.kpis.entradasHoy.toLocaleString('es-CO')}
           sub="movimientos del día"
         />
+      </div>
+
+      {/* Valor consumido por salidas no retornables */}
+      <div className="bg-card border border-border p-5 sm:p-6" style={{ borderRadius: '0.25rem' }}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <SectionHeader
+            title="Valor consumido por salidas"
+            subtitle={`${subtituloValor} · excluye productos que admiten devolución`}
+          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex border border-border p-1">
+              {(['dia', 'mes', 'anio'] as const).map((vista) => (
+                <button
+                  key={vista}
+                  type="button"
+                  onClick={() => setVistaValor(vista)}
+                  className={`px-3 py-1.5 text-[10px] uppercase transition-colors ${vistaValor === vista ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  {vista === 'dia' ? 'Días' : vista === 'mes' ? 'Meses' : 'Años'}
+                </button>
+              ))}
+            </div>
+            <div className="shrink-0 sm:min-w-36 sm:text-right">
+              <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Total del periodo</div>
+              <div className="mt-1 text-xl text-primary" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
+                {formatPesosPreciso(valorSalidas.reduce((total, periodo) => total + periodo.total, 0))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-5 h-72 sm:h-80">
+          {valorSalidas.some((dia) => dia.total > 0) ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={valorSalidas.map((periodo) => ({ ...periodo, fechaCorta: formatPeriodoValor(periodo.fecha, vistaValor) }))}
+                margin={{ top: 8, right: 8, left: 4, bottom: 0 }}
+                barCategoryGap={-2}
+                barGap={0}
+              >
+                <CartesianGrid stroke="#2b2925" strokeDasharray="3 3" vertical={false}/>
+                <XAxis dataKey="fechaCorta" stroke="#9C9C9C" fontSize={9} interval="preserveStartEnd" tickLine={false}/>
+                <YAxis stroke="#9C9C9C" fontSize={9} tickLine={false} tickFormatter={(value) => formatValorEje(Number(value))}/>
+                <Tooltip content={<ValorSalidasTooltip/>} cursor={{ fill: 'rgba(232, 114, 12, 0.06)' }}/>
+                <Bar
+                  dataKey="total"
+                  name="Valor consumido"
+                  fill="#e8720c"
+                  background={<ValorPixelBackground />}
+                  shape={<ValorPixelShape />}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState icon={ArrowUpFromLine} mensaje={`Sin consumo valorizado en los ${subtituloValor.toLowerCase()}`} sub="Las salidas de productos no retornables aparecerán aquí"/>
+          )}
+        </div>
       </div>
 
       {/* Charts principales */}
@@ -440,7 +508,7 @@ function DashboardContenido() {
                   className="flex items-center gap-2 px-3 py-2 border border-border"
                   style={{ borderRadius: '0.25rem' }}
                 >
-                  <MovimientoIcon tipo={m.tipo} />
+                  <MovimientoIcon tipo={m.tipo} signo={m.signo} />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-foreground truncate">{m.producto}</div>
                     <div
@@ -453,10 +521,10 @@ function DashboardContenido() {
                   <div className="text-right shrink-0">
                     <div
                       className={`text-sm font-semibold ${
-                        m.tipo === 'Entrada' ? 'text-secondary' : 'text-primary'
+                        m.signo === 'E' ? 'text-secondary' : 'text-primary'
                       }`}
                     >
-                      {m.tipo === 'Entrada' ? '+' : '−'}
+                      {m.signo === 'E' ? '+' : '−'}
                       {m.cantidad}
                     </div>
                   </div>
@@ -568,15 +636,15 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   )
 }
 
-function MovimientoIcon({ tipo }: { tipo: string }) {
-  if (esEntrada(tipo)) {
+function MovimientoIcon({ tipo, signo }: { tipo: string; signo: string }) {
+  if (signo === 'E' || esEntrada(tipo)) {
     return (
       <div className="w-7 h-7 bg-secondary/15 flex items-center justify-center shrink-0">
         <ArrowDownToLine size={12} className="text-secondary" />
       </div>
     )
   }
-  if (esSalida(tipo)) {
+  if (signo === 'S' || esSalida(tipo)) {
     return (
       <div className="w-7 h-7 bg-primary/15 flex items-center justify-center shrink-0">
         <ArrowUpFromLine size={12} className="text-primary" />
@@ -623,6 +691,124 @@ function EmptyState({
   )
 }
 
+type ValorSalidaDia = DashboardResumen['valorSalidasPorDia'][number]
+
+type PixelShapeProps = {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  fill?: string
+  columnas?: number
+}
+
+function obtenerMetricaPixel(width: number, columnas: number) {
+  const separacion = 2
+  const bloque = Math.max(3, (width - separacion * (columnas - 1)) / columnas)
+  const ancho = columnas * bloque + (columnas - 1) * separacion
+  return { bloque, separacion, paso: bloque + separacion, inicioX: (width - ancho) / 2 }
+}
+
+function ValorPixelBackground({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  columnas,
+}: PixelShapeProps) {
+  if (height <= 0 || width <= 0) return null
+  const columnasEfectivas = columnas ?? Math.max(1, Math.round((width + 2) / 15))
+  const metrica = obtenerMetricaPixel(width, columnasEfectivas)
+  const filas = Math.floor(height / metrica.paso)
+
+  return (
+    <g opacity={0.3}>
+      {Array.from({ length: filas }, (_, fila) =>
+        Array.from({ length: columnasEfectivas }, (_, columna) => (
+          <rect
+            key={`${fila}-${columna}`}
+            x={x + metrica.inicioX + columna * metrica.paso}
+            y={y + height - (fila + 1) * metrica.paso}
+            width={metrica.bloque}
+            height={metrica.bloque}
+            rx={0.8}
+            fill="#45413a"
+          />
+        )),
+      )}
+    </g>
+  )
+}
+
+function ValorPixelShape({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  fill = '#e8720c',
+  columnas,
+}: PixelShapeProps) {
+  if (height <= 0 || width <= 0) return null
+  const columnasEfectivas = columnas ?? Math.max(1, Math.round((width + 2) / 15))
+  const metrica = obtenerMetricaPixel(width, columnasEfectivas)
+  const filasBase = Math.max(1, Math.floor(height / metrica.paso))
+  const baseY = y + height
+
+  return (
+    <g>
+      {Array.from({ length: columnasEfectivas }, (_, columna) => {
+        const filas = filasBase
+        return Array.from({ length: filas }, (_, fila) => (
+          <rect
+            key={`${fila}-${columna}`}
+            x={x + metrica.inicioX + columna * metrica.paso}
+            y={baseY - (fila + 1) * metrica.paso}
+            width={metrica.bloque}
+            height={metrica.bloque}
+            rx={0.8}
+            fill={fill}
+          />
+        ))
+      })}
+    </g>
+  )
+}
+
+function ValorSalidasTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ payload: ValorSalidaDia & { fechaCorta?: string } }>
+}) {
+  if (!active || !payload?.length) return null
+
+  const dia = payload[0].payload
+  return (
+    <div className="min-w-[230px] max-w-[320px] rounded-md border border-[#45413a] bg-[#17140f] p-3 shadow-2xl">
+      <div className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        {formatFechaLarga(dia.fecha)}
+      </div>
+      <div className="mt-1 text-lg text-primary" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}>
+        {formatPesosPreciso(dia.total)}
+      </div>
+      <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
+        {dia.detalles.map((detalle) => (
+          <div key={detalle.codigo} className="flex items-start justify-between gap-4 border-t border-border/70 pt-2">
+            <div className="min-w-0">
+              <div className="truncate text-xs text-foreground">{detalle.producto}</div>
+              <div className="mt-0.5 text-[9px] text-muted-foreground">
+                {detalle.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 3 })} {detalle.unidad}
+              </div>
+            </div>
+            <div className="shrink-0 text-xs font-semibold text-foreground">{formatPesosPreciso(detalle.valor)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ──────────────────────────────────────────────────────────
 //  Helpers
 // ──────────────────────────────────────────────────────────
@@ -633,6 +819,43 @@ function formatPesos(n: number): string {
     currency: 'COP',
     maximumFractionDigits: 0,
   }).format(n)
+}
+
+function formatPesosPreciso(n: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n)
+}
+
+function formatValorEje(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toLocaleString('es-CO', { maximumFractionDigits: 1 })}M`
+  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toLocaleString('es-CO', { maximumFractionDigits: 1 })}k`
+  return `$${n.toLocaleString('es-CO', { maximumFractionDigits: 0 })}`
+}
+
+function formatFechaLarga(iso: string): string {
+  if (/^\d{4}$/.test(iso)) return `Año ${iso}`
+  if (/^\d{4}-\d{2}$/.test(iso)) {
+    const [anio, mes] = iso.split('-').map(Number)
+    return new Date(anio, mes - 1, 1).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+  }
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+function formatPeriodoValor(periodo: string, vista: 'dia' | 'mes' | 'anio'): string {
+  if (vista === 'anio') return periodo
+  if (vista === 'mes') {
+    const [anio, mes] = periodo.split('-').map(Number)
+    return new Date(anio, mes - 1, 1).toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })
+  }
+  return formatFechaCorta(periodo)
 }
 
 function formatFechaCorta(iso: string): string {

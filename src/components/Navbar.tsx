@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 
@@ -11,19 +11,31 @@ const navLinks = [
 
 export function Navbar() {
   const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const actualizarEstado = () => setScrolled(window.scrollY > 8)
+    actualizarEstado()
+    window.addEventListener('scroll', actualizarEstado, { passive: true })
+    return () => window.removeEventListener('scroll', actualizarEstado)
+  }, [])
 
   return (
     <header
-      className="fixed top-0 inset-x-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border"
+      className={`fixed top-0 inset-x-0 z-50 overflow-x-clip bg-background/95 backdrop-blur-sm border-b transition-colors duration-200 ${
+        scrolled ? 'border-border' : 'border-transparent'
+      }`}
       style={{ fontFamily: "'DM Sans', system-ui, sans-serif", paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <a href="#" className="flex items-center">
+        <a href="#" className="flex min-w-0 items-center gap-1">
           <span
-            className="text-foreground text-2xl tracking-wider"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
+            className="font-brand text-[clamp(0.95rem,5vw,1.5rem)] text-primary tracking-wide"
           >
-            BodegaApliSmart
+            Bodega
+          </span>
+          <span className="font-brand text-[clamp(0.95rem,5vw,1.5rem)] text-white tracking-wide">
+             ApliSmart
           </span>
         </a>
 
@@ -63,18 +75,40 @@ export function Navbar() {
         </div>
 
         <button
-          className="md:hidden text-foreground min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center"
+          className="relative md:hidden text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
           onClick={() => setOpen((o) => !o)}
           aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={open}
         >
-          {open ? <X size={22} /> : <Menu size={22} />}
+          <Menu
+            size={22}
+            className={`absolute transition-all duration-300 ease-out ${
+              open ? 'rotate-90 scale-75 opacity-0' : 'rotate-0 scale-100 opacity-100'
+            }`}
+          />
+          <X
+            size={22}
+            className={`absolute transition-all duration-300 ease-out ${
+              open ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-75 opacity-0'
+            }`}
+          />
         </button>
       </div>
 
-      {open && (
-        <div className="md:hidden border-t border-border bg-background">
-          <div className="px-6 py-4 flex flex-col gap-4">
+      <div
+        className={`grid bg-background transition-[grid-template-rows,opacity,border-color] duration-300 ease-out md:hidden ${
+          open
+            ? 'grid-rows-[1fr] border-t border-border opacity-100'
+            : 'pointer-events-none grid-rows-[0fr] border-t border-transparent opacity-0'
+        }`}
+        aria-hidden={!open}
+      >
+        <div className="overflow-hidden">
+          <div
+            className={`px-6 py-4 flex flex-col gap-4 transition-transform duration-300 ease-out ${
+              open ? 'translate-y-0' : '-translate-y-3'
+            }`}
+          >
             {navLinks.map((link) => (
               <a
                 key={link.href}
@@ -104,7 +138,7 @@ export function Navbar() {
             </div>
           </div>
         </div>
-      )}
+      </div>
     </header>
   )
 }

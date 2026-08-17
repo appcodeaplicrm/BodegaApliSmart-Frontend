@@ -95,6 +95,20 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      // Proxy del WebSocket. En LOCAL:
+      //   - El front pide http://localhost:5173/socket.io
+      //   - Vite lo reenvía a http://localhost:3001/socket.io (back).
+      //   - `ws: true` es crítico para que Vite haga el upgrade a
+      //     WebSocket (sino se queda en long-polling y se cae en
+      //     cuanto el dev server se recarga).
+      // En PRODUCCIÓN este bloque no se usa (Vite no corre); el
+      // front pide directamente /api/socket.io y el reverse proxy
+      // de aaPanel se encarga del rewrite /api/* → /*.
+      '/socket.io': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })

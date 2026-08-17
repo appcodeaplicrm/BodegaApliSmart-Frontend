@@ -31,7 +31,8 @@ export type DashboardResumen = {
   }>
   ultimosMovimientos: Array<{
     id: string
-    tipo: string // ID del TipoMovimiento
+    tipo: string
+    signo: string
     producto: string
     codigo: string
     cantidad: number
@@ -54,6 +55,31 @@ export type DashboardResumen = {
     entradas: number
     salidas: number
   }>
+  valorSalidasPorDia: Array<{
+    fecha: string
+    total: number
+    detalles: Array<{
+      producto: string
+      codigo: string
+      cantidad: number
+      unidad: string
+      valor: number
+    }>
+  }>
+  valorSalidasPorMes: DashboardResumen['valorSalidasPorDia']
+  valorSalidasPorAnio: DashboardResumen['valorSalidasPorDia']
+  auditoriaInteligente: {
+    total: number
+    criticas: number
+    altas: number
+    recientes: Array<{
+      id: string
+      titulo: string
+      resumen: string
+      severidad: 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
+      ultimaDeteccion: string
+    }>
+  } | null
   /** Stock agrupado por unidad de medida (no se suman entre unidades). */
   stockPorUnidad: Array<{
     unidad: string
@@ -133,6 +159,23 @@ export const dashboardStore = {
       setEstado({ status: 'error', mensaje, bodegaId })
       throw err
     }
+  },
+
+  /** Fuerza una consulta nueva sin mostrar el skeleton ni reutilizar el caché. */
+  async refetch(bodegaId: string): Promise<DashboardResumen> {
+    const resumen = await api.get<DashboardResumen>(
+      `/dashboard/resumen?bodegaId=${encodeURIComponent(bodegaId)}`,
+    )
+    setEstado({ status: 'listo', resumen, bodegaId })
+    return resumen
+  },
+
+  /** Revalida silenciosamente el dashboard abierto si el evento le corresponde. */
+  async refetchActual(eventBodegaId?: string | null): Promise<void> {
+    if (estado.status !== 'listo') return
+    const actual = estado.bodegaId
+    if (eventBodegaId && eventBodegaId !== actual) return
+    await dashboardStore.refetch(actual)
   },
 
   reset() {

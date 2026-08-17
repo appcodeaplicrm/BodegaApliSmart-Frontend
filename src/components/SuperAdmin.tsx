@@ -511,7 +511,7 @@ function PermissionModuleSelector({ catalog, selected, onChange }: { catalog: Pe
         <span className={`w-5 h-5 flex items-center justify-center border transition-colors ${moduleEnabled ? 'bg-secondary border-secondary text-background' : enabledCount > 0 ? 'border-secondary text-secondary' : 'border-border text-transparent'}`}>
           <Check size={13}/>
         </span>
-        <span className="uppercase font-heading font-black text-lg tracking-wide">{module}</span>
+        <span className="uppercase font-heading font-black text-lg tracking-wide">{moduleLabel(module)}</span>
         <span className={`ml-auto px-2 py-1 text-[9px] font-mono border ${enabledCount > 0 ? 'text-secondary border-secondary/25 bg-secondary/10' : 'text-muted-foreground border-border'}`}>{enabledCount} / {keys.length}</span>
       </button>
       <div className="p-3 space-y-2">{sortedSubmodules(module, submodules).map(([submodule, submodulePermissions]) => {
@@ -536,7 +536,7 @@ function PermissionModuleSelector({ catalog, selected, onChange }: { catalog: Pe
 function ModuleBadges({ catalog, selected }: { catalog: PermissionApi[]; selected: string[] }) {
   const allowed = new Set(selected)
   const modules = Object.entries(groupPermissions(catalog)).filter(([, permissions]) => permissions.some(permission => allowed.has(permission.key))).map(([module]) => module)
-  return <div className="flex flex-wrap gap-1.5">{modules.length ? modules.map(module => <span key={module} className="px-2 py-1 bg-secondary/10 border border-secondary/20 text-secondary text-[9px] font-mono uppercase">{module}</span>) : <span className="text-[10px] text-muted-foreground">Sin módulos habilitados</span>}</div>
+  return <div className="flex flex-wrap gap-1.5">{modules.length ? modules.map(module => <span key={module} className="px-2 py-1 bg-secondary/10 border border-secondary/20 text-secondary text-[9px] font-mono uppercase">{moduleLabel(module)}</span>) : <span className="text-[10px] text-muted-foreground">Sin módulos habilitados</span>}</div>
 }
 
 function PlanPreviewCard({ plan, catalog }: { plan: Plan; catalog: PermissionApi[] }) {
@@ -559,7 +559,7 @@ function PlanPreviewCard({ plan, catalog }: { plan: Plan; catalog: PermissionApi
 function CompactModuleBadges({ catalog, selected }: { catalog: PermissionApi[]; selected: string[] }) {
   const allowed = new Set(selected)
   const modules = Object.entries(groupPermissions(catalog)).filter(([, permissions]) => permissions.some(permission => allowed.has(permission.key))).map(([module]) => module)
-  return <div className="flex flex-wrap gap-1">{modules.length ? modules.map(module => <span key={module} className="px-1.5 py-0.5 bg-secondary/10 border border-secondary/20 text-secondary text-[7px] font-mono uppercase">{module}</span>) : <span className="text-[8px] text-muted-foreground">Sin módulos habilitados</span>}</div>
+  return <div className="flex flex-wrap gap-1">{modules.length ? modules.map(module => <span key={module} className="px-1.5 py-0.5 bg-secondary/10 border border-secondary/20 text-secondary text-[7px] font-mono uppercase">{moduleLabel(module)}</span>) : <span className="text-[8px] text-muted-foreground">Sin módulos habilitados</span>}</div>
 }
 
 function groupPermissions(catalog: PermissionApi[]): Record<string, PermissionApi[]> {
@@ -592,6 +592,14 @@ const SUBMODULE_LABELS: Record<string, string> = {
   'reportes.salidas': 'Salida',
   'reportes.entradas': 'Entrada',
   'reportes.kardex': 'Kardex',
+}
+
+const MODULE_LABELS: Record<string, string> = {
+  auditoria: 'Auditoría inteligente',
+}
+
+function moduleLabel(module: string): string {
+  return MODULE_LABELS[module] ?? module
 }
 
 const SUBMODULE_ORDER: Record<string, string[]> = {

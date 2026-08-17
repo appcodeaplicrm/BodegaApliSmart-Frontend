@@ -12,6 +12,7 @@ import { authStore } from '../store/auth'
 import { MODULOS } from '../store/permisos'
 import { permisoDeRuta, primeraRutaPermitida } from '../lib/routing'
 import { imageUrl } from '../lib/apiBase'
+import { useRealtimeStatus } from './RealtimeProvider'
 import {
   LayoutDashboard,
   Boxes,
@@ -155,6 +156,13 @@ const general: NavItem[] = [
     badge: 'alertas', // marker para que el render use el badge dinámico
   },
   {
+    key: 'auditoria',
+    path: '/auditoria',
+    label: 'Auditoría',
+    icon: ShieldCheck,
+    permiso: 'auditoria.ver',
+  },
+  {
     key: 'movimientos',
     path: '/movimientos',
     label: 'Movimientos',
@@ -281,6 +289,7 @@ const superAdminItems: NavItem[] = [
 ]
 
 export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobileClose }: SidebarProps) {
+  const realtimeStatus = useRealtimeStatus()
   const [collapsed, setCollapsed] = useState(false)
   // Submenús que están expandidos. La regla:
   // - Si entramos a un sub-item (active='tecnicos' + subKey='solicitudes'),
@@ -592,13 +601,15 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
         }`}
       >
         {!collapsed && (
-          <div className="flex items-center min-w-0">
-            <span
-              className="text-foreground text-sm tracking-wider truncate"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 200 }}
-            >
-              BodegaApliSmart
-            </span>
+          <div className="flex items-center min-w-0 gap-1">
+          <span
+            className="font-brand text-[clamp(0.40rem,1.5vw,0.95rem)] text-primary tracking-wide"
+          >
+            Bodega
+          </span>
+          <span className="font-brand text-[clamp(0.40rem,1.5vw,0.95rem)] text-white tracking-wide">
+             ApliSmart
+          </span>
           </div>
         )}
         {collapsed && (
@@ -862,7 +873,22 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
           {!collapsed && (
             <>
               <div className="flex-1 text-left min-w-0">
-                <div className="text-xs text-foreground truncate">{nombreUsuario}</div>
+                <div className="text-xs text-foreground flex items-center gap-2 min-w-0">
+                  <span className="truncate">{nombreUsuario}</span>
+                  <span
+                    aria-label={`Estado de conexión: ${realtimeStatus}`}
+                    title={`Estado de conexión: ${realtimeStatus}`}
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      realtimeStatus === 'connected'
+                        ? 'bg-emerald-500'
+                        : realtimeStatus === 'connecting'
+                          ? 'bg-amber-500 animate-pulse'
+                          : realtimeStatus === 'error'
+                            ? 'bg-red-500'
+                            : 'bg-zinc-500'
+                    }`}
+                  />
+                </div>
                 <div
                   className="text-[9px] text-muted-foreground flex items-center gap-1"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}

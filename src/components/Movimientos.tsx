@@ -116,6 +116,28 @@ export function Movimientos() {
     return true
   })
 
+  // Una compra genera un movimiento de inventario por cada producto. En el
+  // historial se presenta como una sola operación para no duplicar tarjetas.
+  const movimientosAgrupados = visibles.reduce<
+    Array<{ movimiento: Movimiento; movimientosCompra: Movimiento[] }>
+  >((grupos, movimiento) => {
+    const compraId = movimiento.compra?.id
+    if (!compraId) {
+      grupos.push({ movimiento, movimientosCompra: [movimiento] })
+      return grupos
+    }
+
+    const compraExistente = grupos.find(
+      (grupo) => grupo.movimiento.compra?.id === compraId,
+    )
+    if (compraExistente) {
+      compraExistente.movimientosCompra.push(movimiento)
+    } else {
+      grupos.push({ movimiento, movimientosCompra: [movimiento] })
+    }
+    return grupos
+  }, [])
+
   async function handleRefresh() {
     cargarMovs()
   }
@@ -155,7 +177,7 @@ export function Movimientos() {
               style={{ borderRadius: '0.25rem' }}
             >
               <Plus size={13} />
-              Nuevo Movimiento
+              Nueva Compra
             </button>
           </div>
         }
@@ -183,7 +205,7 @@ export function Movimientos() {
           style={{ borderRadius: '0.25rem' }}
         >
           <Plus size={14} />
-          Nuevo Movimiento
+          Nueva Compra
         </button>
       </div>
 
@@ -277,8 +299,13 @@ export function Movimientos() {
         ) : (
           <>
             <ul className="space-y-2">
-              {visibles.map((m) => (
-                <MovimientoRow key={m.id} m={m} onVerDetalle={setDetalle} />
+              {movimientosAgrupados.map(({ movimiento, movimientosCompra }) => (
+                <MovimientoRow
+                  key={movimiento.compra?.id ?? movimiento.id}
+                  m={movimiento}
+                  movimientosCompra={movimientosCompra}
+                  onVerDetalle={setDetalle}
+                />
               ))}
             </ul>
             <Pagination
@@ -328,7 +355,15 @@ function esEntrada(signo: string) {
   return signo === 'E'
 }
 
-function MovimientoRow({ m, onVerDetalle }: { m: Movimiento; onVerDetalle: (m: Movimiento) => void }) {
+function MovimientoRow({
+  m,
+  movimientosCompra,
+  onVerDetalle,
+}: {
+  m: Movimiento
+  movimientosCompra: Movimiento[]
+  onVerDetalle: (m: Movimiento) => void
+}) {
   const fecha = new Date(m.fecha)
   const fechaStr = fecha.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
   const horaStr = fecha.toLocaleTimeString('es-CO', {
@@ -344,7 +379,9 @@ function MovimientoRow({ m, onVerDetalle }: { m: Movimiento; onVerDetalle: (m: M
       ? 'text-primary border-primary/30 bg-primary/5'
       : 'text-muted-foreground border-border bg-muted/30'
 
-  const esCompraMov = m.tipoMovimiento.nombre === 'Compra'
+  const esCompraMov = m.tipoMovimiento.nombre === 'Compra' || !!m.compra?.id
+  const cantidadProductosCompra = movimientosCompra.length
+  const nombresProductosCompra = movimientosCompra.map((movimiento) => movimiento.producto.nombre)
 
   return (
     <li
@@ -376,13 +413,19 @@ function MovimientoRow({ m, onVerDetalle }: { m: Movimiento; onVerDetalle: (m: M
                 className="text-sm sm:text-base text-foreground leading-tight truncate"
                 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}
               >
-                {m.producto.nombre}
+                {esCompraMov && m.compra?.codigo
+                  ? `Compra ${m.compra.codigo}`
+                  : m.producto.nombre}
               </div>
               <div
                 className="text-[10px] text-muted-foreground flex items-center gap-1 sm:gap-2 mt-0.5 flex-wrap"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                <span>{m.producto.codigo}</span>
+                <span>
+                  {esCompraMov
+                    ? `${cantidadProductosCompra} ${cantidadProductosCompra === 1 ? 'producto' : 'productos'}`
+                    : m.producto.codigo}
+                </span>
                 <span>·</span>
                 <span>{m.usuario.nombre}</span>
                 <span>·</span>
@@ -390,12 +433,6 @@ function MovimientoRow({ m, onVerDetalle }: { m: Movimiento; onVerDetalle: (m: M
                 <span>
                   {fechaStr} {horaStr}
                 </span>
-                {esCompraMov && m.compra?.codigo && (
-                  <>
-                    <span>·</span>
-                    <span className="text-primary font-semibold">{m.compra.codigo}</span>
-                  </>
-                )}
               </div>
             </div>
             <span
@@ -416,13 +453,24 @@ function MovimientoRow({ m, onVerDetalle }: { m: Movimiento; onVerDetalle: (m: M
                 className={`text-lg sm:text-xl font-semibold leading-none ${esEnt ? 'text-secondary' : 'text-primary'}`}
                 style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
               >
-                {esEnt ? '+' : '−'}
-                {Number(m.cantidad).toLocaleString('es-CO')}{' '}
-                <span className="text-xs sm:text-sm text-muted-foreground font-normal">
-                  {m.producto.unidadMedida.abreviatura}
-                </span>
+                {esCompraMov ? (
+                  <>
+                    {cantidadProductosCompra}{' '}
+                    <span className="text-xs sm:text-sm text-muted-foreground font-normal">
+                      {cantidadProductosCompra === 1 ? 'producto comprado' : 'productos comprados'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {esEnt ? '+' : '−'}
+                    {Number(m.cantidad).toLocaleString('es-CO')}{' '}
+                    <span className="text-xs sm:text-sm text-muted-foreground font-normal">
+                      {m.producto.unidadMedida.abreviatura}
+                    </span>
+                  </>
+                )}
               </div>
-              {Number(m.cantidad) !== Number(m.cantidadBase) && (
+              {!esCompraMov && Number(m.cantidad) !== Number(m.cantidadBase) && (
                 <div
                   className="text-[10px] text-muted-foreground mt-0.5"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -447,7 +495,16 @@ function MovimientoRow({ m, onVerDetalle }: { m: Movimiento; onVerDetalle: (m: M
             </button>
           </div>
 
-          {m.observacion && (
+          {esCompraMov && (
+            <p
+              className="mt-2 text-xs text-muted-foreground line-clamp-2"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              {nombresProductosCompra.join(' · ')}
+            </p>
+          )}
+
+          {m.observacion && !esCompraMov && (
             <p
               className="mt-2 text-xs text-muted-foreground line-clamp-2"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
@@ -472,82 +529,23 @@ type ModalProps = {
 }
 
 function NuevoMovimientoModal({ bodegaId, productos, onClose, onCreated }: ModalProps) {
-  const [tipoMovimientoNombre, setTipoMovimientoNombre] = useState<string>('Entrada')
-  const [tiposMovimiento, setTiposMovimiento] = useState<Array<{ id: string; nombre: string; signo: string }>>([])
-
-  useEffect(() => {
-    void movimientosStore
-      .tipos()
-      .then(setTiposMovimiento)
-      .catch(() => undefined)
-  }, [])
-
-  const esCompra = tipoMovimientoNombre === 'Compra'
-
   return (
     <Modal
       open
       onClose={onClose}
-      title={esCompra ? 'Nueva Compra' : 'Nuevo Movimiento'}
-      description={
-        esCompra
-          ? 'Ingresá productos con proveedor, factura y fotos de evidencia'
-          : 'Registrá una entrada, salida o ajuste'
-      }
+      title="Nueva Compra"
+      description="Ingresá productos con proveedor, factura y fotos de evidencia"
       icon={<Plus size={18} className="text-primary" />}
       size="lg"
       dismissOnOverlay={false}
     >
         <div className="space-y-4 p-4 sm:p-5">
-          {/* Selector de tipo va PRIMERO (siempre visible) */}
-          <div>
-            <label
-              className="text-xs text-muted-foreground tracking-widest uppercase mb-1.5 block"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              Tipo de movimiento *
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['Entrada', 'Salida', 'Ajuste', 'Compra'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTipoMovimientoNombre(t)}
-                  className={`min-h-11 px-3 py-2 border text-sm transition-colors ${
-                    tipoMovimientoNombre === t
-                      ? t === 'Entrada' || t === 'Compra'
-                        ? 'border-secondary/40 bg-secondary/10 text-secondary'
-                        : t === 'Salida'
-                          ? 'border-primary/40 bg-primary/10 text-primary'
-                          : 'border-foreground/30 bg-foreground/5 text-foreground'
-                      : 'border-border text-muted-foreground hover:text-foreground'
-                  }`}
-                  style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Form específico según el tipo */}
-          {esCompra ? (
-            <CompraForm
-              bodegaId={bodegaId}
-              productos={productos}
-              onClose={onClose}
-              onCreated={onCreated}
-            />
-          ) : (
-            <MovimientoSimpleForm
-              bodegaId={bodegaId}
-              productos={productos}
-              tiposMovimiento={tiposMovimiento}
-              tipoMovimientoNombre={tipoMovimientoNombre}
-              onClose={onClose}
-              onCreated={onCreated}
-            />
-          )}
+          <CompraForm
+            bodegaId={bodegaId}
+            productos={productos}
+            onClose={onClose}
+            onCreated={onCreated}
+          />
         </div>
     </Modal>
   )
@@ -906,6 +904,45 @@ function CompraForm({
       .catch(() => setProveedores([]))
   }, [bodegaId])
 
+  const productosDisponibles = proveedorId
+    ? productos.filter((producto) =>
+        producto.proveedorIds?.includes(proveedorId),
+      )
+    : productos
+
+  function handleProveedorChange(nuevoProveedorId: string) {
+    setProveedorId(nuevoProveedorId)
+    if (!nuevoProveedorId) return
+
+    const permitidos = new Set(
+      productos
+        .filter((producto) =>
+          producto.proveedorIds?.includes(nuevoProveedorId),
+        )
+        .map((producto) => producto.id),
+    )
+    const habiaIncompatibles = items.some(
+      (item) => item.productoId && !permitidos.has(item.productoId),
+    )
+    if (habiaIncompatibles) {
+      setItems((prev) => prev.map((item) =>
+        item.productoId && !permitidos.has(item.productoId)
+          ? {
+              ...item,
+              productoId: '',
+              cantidad: 0,
+              unidadMedidaId: '',
+              precioUnitario: undefined,
+              fotoFile: null,
+              fotoPreview: null,
+              conversiones: [],
+            }
+          : item,
+      ))
+      setError('Se limpiaron los productos que no pertenecen al proveedor seleccionado.')
+    }
+  }
+
   async function handleCrearProveedor() {
     if (!nuevoProveedorNombre.trim()) return
     setGuardandoProveedor(true)
@@ -915,7 +952,7 @@ function CompraForm({
         bodegaId,
       })
       setProveedores((prev) => [...prev, r])
-      setProveedorId(r.id)
+      handleProveedorChange(r.id)
       setShowNuevoProveedor(false)
       setNuevoProveedorNombre('')
     } catch (err) {
@@ -970,6 +1007,7 @@ function CompraForm({
     actualizarItem(itemId, {
       productoId,
       unidadMedidaId: prod.unidadMedida.id,
+      precioUnitario: Number(prod.precio),
       conversiones: convs,
     })
   }
@@ -1005,6 +1043,10 @@ function CompraForm({
       setError('Agregá al menos un producto a la compra.')
       return
     }
+    if (!proveedorId) {
+      setError('Elegí el proveedor de la compra.')
+      return
+    }
     for (const it of items) {
       if (!it.productoId) {
         setError('Todos los items deben tener un producto.')
@@ -1016,6 +1058,10 @@ function CompraForm({
       }
       if (!it.unidadMedidaId) {
         setError('Elegí la unidad de cada producto.')
+        return
+      }
+      if ((it.precioUnitario ?? 0) <= 0) {
+        setError('Todos los productos deben tener un precio válido en su ficha.')
         return
       }
       if (!it.fotoFile) {
@@ -1079,7 +1125,7 @@ function CompraForm({
       // 3) Mandar la compra
       await api.post('/compras', {
         bodegaId,
-        proveedorId: proveedorId || undefined,
+        proveedorId,
         numeroFactura: numeroFactura.trim() || undefined,
         observacion: observacion.trim() || undefined,
         items: itemsConFoto,
@@ -1098,6 +1144,16 @@ function CompraForm({
     (acc, it) => acc + (it.precioUnitario ?? 0) * it.cantidad,
     0,
   )
+  const formularioCompleto = Boolean(proveedorId) &&
+    items.length > 0 &&
+    items.every((item) =>
+      Boolean(item.productoId) &&
+      item.cantidad > 0 &&
+      Boolean(item.unidadMedidaId) &&
+      (item.precioUnitario ?? 0) > 0 &&
+      Boolean(item.fotoFile),
+    ) &&
+    facturaFiles.length > 0
 
   return (
     <>
@@ -1129,14 +1185,14 @@ function CompraForm({
                 className="text-xs text-muted-foreground tracking-widest uppercase mb-1.5 block"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                Proveedor (opcional)
+                Proveedor *
               </label>
               <div className="flex gap-2">
                 <SelectMobile
                   value={proveedorId}
-                  onChange={setProveedorId}
+                  onChange={handleProveedorChange}
                   options={[
-                    { value: '', label: 'Sin proveedor…' },
+                    { value: '', label: 'Elegí un proveedor…' },
                     ...proveedores.map((p) => ({
                       value: p.id,
                       label: `${p.nombre}${p.ruc ? ` · ${p.ruc}` : ''}`,
@@ -1180,6 +1236,11 @@ function CompraForm({
                       'Crear'
                     )}
                   </button>
+                </div>
+              )}
+              {proveedorId && productosDisponibles.length === 0 && (
+                <div className="mt-2 border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                  Este proveedor no tiene productos asociados. Relaciona los productos desde su ficha antes de registrar la compra.
                 </div>
               )}
             </div>
@@ -1240,7 +1301,8 @@ function CompraForm({
             <button
               type="button"
               onClick={agregarItem}
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 border border-border bg-muted px-3 py-2 text-sm text-foreground transition-colors hover:border-primary/40 hover:text-primary sm:w-auto"
+              disabled={!proveedorId || productosDisponibles.length === 0}
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 border border-border bg-muted px-3 py-2 text-sm text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
               style={{ borderRadius: '0.25rem' }}
             >
               <Plus size={14} />
@@ -1295,7 +1357,7 @@ function CompraForm({
                             <SelectMobile
                               value={it.productoId}
                               onChange={(value) => void onProductoChange(it.id, value)}
-                              options={productos.map((p) => ({
+                              options={productosDisponibles.map((p) => ({
                                 value: p.id,
                                 label: `${p.nombre} (${p.codigo}) · ${p.unidadMedida.abreviatura}`,
                               }))}
@@ -1353,12 +1415,25 @@ function CompraForm({
                                 })
                               }
                               placeholder="Precio"
-                              className="w-full px-3 py-2.5 bg-muted border border-border text-sm text-foreground"
+                              className="w-full px-3 py-2.5 bg-muted/50 border border-border text-sm text-foreground cursor-not-allowed"
                               style={{ borderRadius: '0.25rem' }}
-                              disabled={!prod}
+                              disabled
                             />
                           </div>
                         </div>
+                        {prod && (
+                          <div className="flex justify-end text-[10px] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                            {it.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 3 })} × {(it.precioUnitario ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <span className="ml-2 font-semibold text-foreground">
+                              = {((it.precioUnitario ?? 0) * it.cantidad).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+                        {prod && (it.precioUnitario ?? 0) <= 0 && (
+                          <div className="text-[10px] text-amber-400">
+                            Configura un precio mayor que cero en la ficha del producto.
+                          </div>
+                        )}
                         <FotoItemRow item={it} onChange={onItemFotoChange} />
                       </div>
                       <button
@@ -1381,9 +1456,9 @@ function CompraForm({
               className="flex items-center justify-between text-xs text-muted-foreground px-1"
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-              <span>Total estimado:</span>
+              <span>Total de la factura:</span>
               <span className="text-foreground font-semibold">
-                {totalEstimado.toLocaleString('es-CO', { maximumFractionDigits: 2 })}
+                {totalEstimado.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           )}
@@ -1480,7 +1555,7 @@ function CompraForm({
         <button
           type="submit"
           form="movimiento-compra-form"
-          disabled={submitting || items.length === 0}
+          disabled={submitting || !formularioCompleto}
           className="inline-flex min-w-0 items-center justify-center gap-2 bg-primary px-2 py-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
           style={{ borderRadius: '0.25rem' }}
         >
@@ -1813,11 +1888,6 @@ function DetalleCompra({ compraId }: { compraId: string }) {
     minute: '2-digit',
   })
 
-  const totalEstimado = data.items.reduce(
-    (acc, it) => acc + Number(it.precioUnitario ?? 0) * Number(it.cantidad),
-    0,
-  )
-
   return (
     <div className="space-y-4">
       {/* Header de la compra */}
@@ -1870,9 +1940,9 @@ function DetalleCompra({ compraId }: { compraId: string }) {
           <DetalleItem label="Nº de factura">
             {data.numeroFactura ?? <span className="text-muted-foreground">—</span>}
           </DetalleItem>
-          <DetalleItem label="Total estimado">
+          <DetalleItem label="Total de la factura">
             <span className="text-foreground font-semibold">
-              {totalEstimado.toLocaleString('es-CO', { maximumFractionDigits: 2 })}
+              {Number(data.total).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </DetalleItem>
         </DetalleGrid>
@@ -1971,6 +2041,11 @@ function DetalleCompra({ compraId }: { compraId: string }) {
                           maximumFractionDigits: 2,
                         })}{' '}
                         c/u
+                      </span>
+                    )}
+                    {it.precioUnitario != null && (
+                      <span className="text-[10px] font-semibold text-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        Subtotal: {(Number(it.precioUnitario) * Number(it.cantidad)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     )}
                   </div>

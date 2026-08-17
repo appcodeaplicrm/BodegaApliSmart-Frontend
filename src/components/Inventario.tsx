@@ -31,7 +31,8 @@ const formatPesos = (n: number) =>
   new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n)
 
 const DEFAULT_PAGE_SIZE = 10

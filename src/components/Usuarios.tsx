@@ -440,6 +440,12 @@ export function Usuarios() {
         <EditarUsuarioModal
           usuario={editing}
           onClose={() => setEditing(null)}
+          onSaved={() => {
+            // El back no emite realtime de usuario.*, así que tenemos
+            // que recargar la lista manualmente para que la grilla
+            // muestre el rol / bodega / estado / permisos nuevos.
+            cargar()
+          }}
         />
       )}
 
@@ -447,6 +453,12 @@ export function Usuarios() {
         <CambiarPasswordModal
           usuario={changingPass}
           onClose={() => setChangingPass(null)}
+          onChanged={() => {
+            // Solo necesario si el admin se cambió su propia pass:
+            // refrescamos la sesión para que `authStore` tenga los datos
+            // actualizados (sirve para casos como forzar re-login).
+            cargar()
+          }}
         />
       )}
 

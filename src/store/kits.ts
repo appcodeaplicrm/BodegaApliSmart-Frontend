@@ -76,6 +76,12 @@ type Estado =
 
 let estado: Estado = { status: 'idle' }
 let cacheSnapshot: Estado = estado
+/**
+ * Cache del último `bodegaId` usado en `cargar()`. Lo usan los
+ * handlers realtime para re-sincronizar la lista cuando llega
+ * `kit.creado/actualizado/elminado` desde otro user.
+ */
+let lastBodegaId: string | undefined
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -117,6 +123,7 @@ export const kitsStore = {
   getSnapshot,
 
   async cargar(bodegaId?: string): Promise<Kit[]> {
+    lastBodegaId = bodegaId
     setEstado({ status: 'cargando' })
     try {
       const path = bodegaId ? `/kits?bodegaId=${encodeURIComponent(bodegaId)}` : '/kits'
@@ -160,6 +167,26 @@ export const kitsStore = {
         status: 'listo',
         kits: estado.kits.filter((k) => k.id !== id),
       })
+    }
+  },
+
+  /**
+   * Refetch silencioso: re-carga los kits de la última bodega
+   * consultada sin parpadear la lista (status sigue 'listo').
+   * Lo usan los handlers realtime cuando llega `kit.creado/actualizado/
+   * eliminado` desde otro user.
+   */
+  async recargarSilencioso(): Promise<void> {
+    try {
+      const path = lastBodegaId
+        ? `/kits?bodegaId=${encodeURIComponent(lastBodegaId)}`
+        : '/kits'
+      const data = await api.get<Kit[]>(path)
+      if (estado.status === 'listo') {
+        setEstado({ status: 'listo', kits: data })
+      }
+    } catch {
+      // Silencioso
     }
   },
 

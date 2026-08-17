@@ -69,6 +69,28 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
     }
   }, [devolucion.id])
 
+  /**
+   * Refetch silencioso del `completo` desde el back. Se llama cuando
+   * el DevolucionWizard termina (operador envía, bodeguero recibe) para
+   * que la lista de items del modal refleje el nuevo estado de cada
+   * item (pendiente → en_transito → recibido/rechazado). Si no, el
+   * botón "Enviar X productos" puede seguir mostrando items que ya
+   * están en tránsito hasta que se cierre y reabra el modal.
+   */
+  function recargarCompleto() {
+    if (cargando) return
+    setCargando(true)
+    devolucionesStore
+      .findOne(devolucion.id)
+      .then((d) => setCompleto(d))
+      .catch((err) => {
+        const msg =
+          err instanceof Error ? err.message : 'No se pudo refrescar la devolución.'
+        setErrorCarga(msg)
+      })
+      .finally(() => setCargando(false))
+  }
+
   const permisosUsuario = new Set<string>(
     auth.status === 'autenticado' ? auth.sesion.permisos : [],
   )
@@ -135,6 +157,9 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
               .cargarPaginado({ bodegaId, page: 1, pageSize: 20 })
               .catch(() => undefined)
           }
+          // Re-trae el `completo` para que el modal muestre el estado
+          // nuevo de cada item (los pendientes pasaron a en_transito).
+          recargarCompleto()
         }}
       />
     )
@@ -153,6 +178,9 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
               .cargarPaginado({ bodegaId, page: 1, pageSize: 20 })
               .catch(() => undefined)
           }
+          // Re-trae el `completo` para que el modal muestre el estado
+          // nuevo de cada item (los en_transito pasaron a recibido/rechazado).
+          recargarCompleto()
         }}
       />
     )

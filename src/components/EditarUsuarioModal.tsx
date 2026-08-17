@@ -31,6 +31,12 @@ import { Modal } from './Modal'
 type EditarUsuarioModalProps = {
   usuario: Usuario
   onClose: () => void
+  /**
+   * Llamado cuando el guardado (PUT /usuarios/:id/bodegas/:bodegaId)
+   * termina OK. Útil para que la vista padre refresque la grilla sin
+   * tener que recargar la página.
+   */
+  onSaved?: () => void
 }
 
 const ESTADOS: EstadoUsuario[] = ['Activo', 'Inactivo']
@@ -58,7 +64,7 @@ const ESTADOS: EstadoUsuario[] = ['Activo', 'Inactivo']
  */
 type PermisoEstado = Record<string, boolean>
 
-export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps) {
+export function EditarUsuarioModal({ usuario, onClose, onSaved }: EditarUsuarioModalProps) {
   const { roles } = usePermisos()
   const [nombre, setNombre] = useState(usuario.nombre)
   const [email, setEmail] = useState(usuario.email)
@@ -325,6 +331,7 @@ export function EditarUsuarioModal({ usuario, onClose }: EditarUsuarioModalProps
         await authStore.refrescar()
       }
 
+      onSaved?.()
       onClose()
     } catch (err) {
       const msg =

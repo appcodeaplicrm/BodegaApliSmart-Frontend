@@ -21,6 +21,7 @@ import { CategoriasScreen } from './inventario/CategoriasScreen'
 import { MarcasScreen } from './inventario/MarcasScreen'
 import { ProveedoresScreen } from './inventario/ProveedoresScreen'
 import { UbicacionesScreen } from './inventario/UbicacionesScreen'
+import { Auditoria } from './Auditoria'
 
 type DashboardProps = {
   /**
@@ -46,6 +47,7 @@ type DashboardProps = {
     | 'marcas'
     | 'proveedores'
     | 'ubicaciones'
+    | 'auditoria'
   onExit: () => void | Promise<void>
 }
 
@@ -149,6 +151,12 @@ export function Dashboard({ view = 'dashboard', onExit }: DashboardProps) {
       {view === 'movimientos' && (
         <PermissionGate permiso="movimientos.ver" fallback={<Forbidden />}>
           <Movimientos />
+        </PermissionGate>
+      )}
+
+      {view === 'auditoria' && (
+        <PermissionGate permiso="auditoria.ver" fallback={<Forbidden />}>
+          <Auditoria />
         </PermissionGate>
       )}
 

@@ -25,6 +25,7 @@ export type ModuloKey =
   | 'roles'
   | 'kits'
   | 'alertas'
+  | 'auditoria'
   | 'tecnicos'
   | 'reportes'
   | 'admin'
@@ -35,6 +36,7 @@ export type Accion = (typeof ACCIONES)[number]
 export type SubmoduloDef = {
   key: string
   label: string
+  acciones?: readonly Accion[]
 }
 
 export type ModuloDef = {
@@ -67,6 +69,12 @@ export const MODULOS: readonly ModuloDef[] = [
     key: 'alertas',
     label: 'Alertas',
     acciones: ['ver', 'editar'],
+    submodulos: [{ key: 'historial', label: 'Historial', acciones: ['ver'] }],
+  },
+  {
+    key: 'auditoria',
+    label: 'Auditoría inteligente',
+    acciones: ['ver', 'crear', 'editar'],
   },
   {
     key: 'tecnicos',

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { HeaderNotificationsButton } from './HeaderNotificationsButton'
+import { GlobalAiAssistant } from './AiAssistantCenter'
 
 /**
  * AppLayout — wrapper compartido por todas las vistas autenticadas.
@@ -93,6 +94,7 @@ export function AppLayout({
 
         <main className="flex-1 min-w-0 min-h-0 overflow-y-auto">{children}</main>
       </div>
+      <GlobalAiAssistant />
     </div>
   )
 }
@@ -106,6 +108,7 @@ function prettyTitle(active: string, subKey?: string): string {
     dashboard: 'Dashboard',
     inventario: 'Inventario',
     alertas: 'Alertas',
+    auditoria: 'Auditoría',
     movimientos: 'Movimientos',
     despachos: 'Despachos',
     ordenes: 'Órdenes',

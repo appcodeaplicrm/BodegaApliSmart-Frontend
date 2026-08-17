@@ -24,10 +24,11 @@ import {
 } from '../store/productos'
 import { useUnidadesMedida, unidadesMedidaStore } from '../store/unidades-medida'
 import { useMarcas, marcasStore } from '../store/marcas'
-import { useUbicaciones } from '../store/ubicaciones'
+import { useUbicaciones, ubicacionesService } from '../store/ubicaciones'
 import { useAuth } from '../store/auth'
 import { ModalCrearCatalogo } from './ModalCrearCatalogo'
 import { Modal } from './Modal'
+import { useCatalogoRealtime } from '../hooks/useCatalogoRealtime'
 
 type DocUpload = {
   id: string
@@ -111,6 +112,32 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
       void catalogosService.proveedores(bodegaId).then(setProveedores).catch(() => undefined)
     }
   }, [bodegaId])
+
+  /**
+   * Realtime: cuando otro user crea/edita/elimina un catálogo
+   * (categoría, marca, proveedor) o una unidad de medida / ubicación,
+   * refetcheamos la lista local para que este modal refleje el cambio.
+   * Si el modal está abierto, las opciones del <select> se actualizan
+   * al instante.
+   */
+  useCatalogoRealtime(
+    ['categoria', 'marca', 'proveedor'],
+    () => {
+      if (!bodegaId) return
+      void catalogosService.categorias(bodegaId).then(setCategorias).catch(() => undefined)
+      void catalogosService.proveedores(bodegaId).then(setProveedores).catch(() => undefined)
+      void marcasStore.cargar(bodegaId).catch(() => undefined)
+    },
+  )
+  useCatalogoRealtime(['unidad-medida'], () => {
+    void unidadesMedidaStore.cargar().catch(() => undefined)
+  })
+  useCatalogoRealtime(['ubicacion'], () => {
+    // `ubicacionesService` no tiene store global; el cache es interno
+    // al módulo y se invalida con `invalidarCache()`. Eso dispara un
+    // re-fetch en todos los `useUbicaciones(bodegaId)` montados.
+    ubicacionesService.invalidarCache()
+  })
 
   // Sembrar la lista local de marcas cuando el store termine de cargar.
   // Usamos una clave `seeded` para no pisar los nuevos ingresos del usuario.
@@ -612,6 +639,8 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                   <input
                     type="number"
                     min={0}
+                    step="0.01"
+                    inputMode="decimal"
                     value={precio}
                     onChange={(e) => setPrecio(Number(e.target.value))}
                     className={inputClass}

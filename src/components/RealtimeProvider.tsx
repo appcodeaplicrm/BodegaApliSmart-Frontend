@@ -14,7 +14,7 @@
  * El provider solo se encarga del lifecycle: connect al montar, disconnect
  * al desmontar, y exponer el status para el indicador.
  */
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import {
   disconnectSocket,
   getSocket,
@@ -31,6 +31,17 @@ import { productosStore } from '../store/productos'
 import { pedidosStore } from '../store/pedidos'
 import { devolucionesStore } from '../store/devoluciones'
 import { bodegaActivaStore, useBodegaActiva } from '../store/bodegaActiva'
+import { dashboardStore } from '../store/dashboard'
+import { kitsStore } from '../store/kits'
+import { permisosStore } from '../store/permisos'
+import { usuariosStore } from '../store/usuarios'
+import { bodegasStore } from '../store/bodegas'
+
+const RealtimeStatusContext = createContext<SocketStatus>('disconnected')
+
+export function useRealtimeStatus(): SocketStatus {
+  return useContext(RealtimeStatusContext)
+}
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const auth = useAuth()
@@ -79,9 +90,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // evento, despachamos al store correspondiente.
   useRealtimeEvent('alerta.created', (e) => {
     alertasStore.handleAlertaCreada(e as any)
+    if (e.bodegaId) void alertasStore.refetch(e.bodegaId).catch(() => undefined)
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('alerta.resolved', (e) => {
     alertasStore.handleAlertaResuelta(e)
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('movimiento.created', (e) => {
     // Refetch silencioso de la lista de productos (la cantidad de stock
@@ -95,15 +109,42 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // El refetch trae el movimiento completo desde /movimientos con la
     // forma que el componente ya sabe consumir.
     void movimientosStore.refetchActual()
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
+  })
+  /**
+   * `compra.creada` cubre el caso de Movimientos → "Registrar compra"
+   * (multi-item). Una compra crea N MovimientoInventario pero emite UN
+   * solo evento. El back se encarga de actualizar stock + costoPromedio
+   * en la misma transacción. Acá disparamos UN refetch por cada store
+   * afectado, en vez de N refetches si emitiéramos `movimiento.created`
+   * por cada item.
+   */
+  useRealtimeEvent('compra.creada', (e) => {
+    // Mismo handler que `movimiento.created` para el refetch de la
+    // lista de productos: el stock de los productos afectados cambió.
+    void productosStore.handleMovimientoCreado({ bodegaId: e.bodegaId })
+    // Refetch de movimientos: aparecen N nuevos (uno por item).
+    void movimientosStore.refetchActual()
+    // Alertas: una compra puede subir el stock por encima del mínimo
+    // y resolver alertas críticas. El back ya las marca como resueltas
+    // si corresponde, pero el front necesita refetchear la lista para
+    // que el conteo del chip y la grilla reflejen el cambio.
+    if (e.bodegaId) {
+      void alertasStore.refetch(e.bodegaId).catch(() => undefined)
+    }
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('producto.creado', (e) => {
     void productosStore.handleProductoCambiado({ bodegaId: e.bodegaId })
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('producto.actualizado', (e) => {
     void productosStore.handleProductoCambiado({ bodegaId: e.bodegaId })
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('producto.eliminado', (e) => {
     void productosStore.handleProductoCambiado({ bodegaId: e.bodegaId })
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('pedido.creado', (e) => {
     const currentBodegaId = bodegaActivaStore.getSnapshot().bodegaId ?? undefined
@@ -112,9 +153,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       payload: e.payload as any,
       currentBodegaId,
     })
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('pedido.estado-cambiado', (e) => {
     pedidosStore.handleEstadoCambiado(e as any)
+    void dashboardStore.refetchActual(e.bodegaId).catch(() => undefined)
   })
   useRealtimeEvent('entrega-item.cambiado', (e) => {
     pedidosStore.handleEntregaItemCambiado(e as any)
@@ -131,12 +174,76 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     devolucionesStore.handleDevolucionCambiada(e as any)
   })
 
-  return (
-    <>
-      {children}
-      <RealtimeIndicator status={status} />
-    </>
-  )
+  // ── Paso 3: cobertura completa de catálogos + multi-user ────
+  // Para los stores globales (kit, usuario, rol, bodega) hacemos
+  // refetch directo. Para los catálogos locales (categoría, marca,
+  // proveedor, ubicación, unidad-medida) que NO tienen store global,
+  // despachamos un CustomEvent en window. Cada pantalla que muestra
+  // un catálogo escucha ese evento y refetchea en silencio.
+
+  useRealtimeEvent('kit.creado', (e) => {
+    if (e.bodegaId) {
+      void kitsStore.cargar(e.bodegaId).catch(() => undefined)
+    } else {
+      void kitsStore.recargarSilencioso().catch(() => undefined)
+    }
+  })
+  useRealtimeEvent('kit.actualizado', () => {
+    void kitsStore.recargarSilencioso().catch(() => undefined)
+  })
+  useRealtimeEvent('kit.eliminado', () => {
+    void kitsStore.recargarSilencioso().catch(() => undefined)
+  })
+
+  useRealtimeEvent('rol.creado', () => {
+    void permisosStore.cargar().catch(() => undefined)
+  })
+  useRealtimeEvent('rol.actualizado', () => {
+    void permisosStore.cargar().catch(() => undefined)
+  })
+  useRealtimeEvent('rol.eliminado', () => {
+    void permisosStore.cargar().catch(() => undefined)
+  })
+
+  useRealtimeEvent('usuario.creado', () => {
+    void usuariosStore.recargarSilencioso().catch(() => undefined)
+  })
+  useRealtimeEvent('usuario.actualizado', () => {
+    void usuariosStore.recargarSilencioso().catch(() => undefined)
+  })
+  useRealtimeEvent('usuario.eliminado', () => {
+    void usuariosStore.recargarSilencioso().catch(() => undefined)
+  })
+
+  useRealtimeEvent('bodega.creada', () => {
+    // Sin bodegaId porque es broad del tenant. Forzamos recarga
+    // completa (no tenemos lastQuery cacheado en bodegasStore).
+    void bodegasStore.cargar({ force: true }).catch(() => undefined)
+  })
+
+  // Catálogos locales — disparan CustomEvent en window. Ver `useCatalogoRealtime`
+  // (helper que las pantallas usan para escuchar).
+  const dispatchCatalogo = (tipo: string) => {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(new CustomEvent('realtime:catalogo', { detail: { tipo } }))
+  }
+  useRealtimeEvent('categoria.creada', () => dispatchCatalogo('categoria'))
+  useRealtimeEvent('categoria.actualizada', () => dispatchCatalogo('categoria'))
+  useRealtimeEvent('categoria.eliminada', () => dispatchCatalogo('categoria'))
+  useRealtimeEvent('marca.creada', () => dispatchCatalogo('marca'))
+  useRealtimeEvent('marca.actualizada', () => dispatchCatalogo('marca'))
+  useRealtimeEvent('marca.eliminada', () => dispatchCatalogo('marca'))
+  useRealtimeEvent('proveedor.creado', () => dispatchCatalogo('proveedor'))
+  useRealtimeEvent('proveedor.actualizado', () => dispatchCatalogo('proveedor'))
+  useRealtimeEvent('proveedor.eliminado', () => dispatchCatalogo('proveedor'))
+  useRealtimeEvent('ubicacion.creada', () => dispatchCatalogo('ubicacion'))
+  useRealtimeEvent('ubicacion.actualizada', () => dispatchCatalogo('ubicacion'))
+  useRealtimeEvent('ubicacion.eliminada', () => dispatchCatalogo('ubicacion'))
+  useRealtimeEvent('unidad-medida.creada', () => dispatchCatalogo('unidad-medida'))
+  useRealtimeEvent('unidad-medida.actualizada', () => dispatchCatalogo('unidad-medida'))
+  useRealtimeEvent('unidad-medida.eliminada', () => dispatchCatalogo('unidad-medida'))
+
+  return <RealtimeStatusContext.Provider value={status}>{children}</RealtimeStatusContext.Provider>
 }
 
 function RealtimeIndicator({ status }: { status: SocketStatus }) {

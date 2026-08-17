@@ -406,6 +406,21 @@ const isLanding = location.pathname === '/'
           }
         />
         <Route
+          path="/auditoria"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <Dashboard view="auditoria" onExit={handleExit} />
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/despachos"
           element={
             <RequireAuth

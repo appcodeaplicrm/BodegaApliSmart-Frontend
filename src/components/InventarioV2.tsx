@@ -17,11 +17,9 @@ import {
   ChevronDown,
   ChevronRight,
   Edit3,
-  ArrowUpFromLine,
   MoreHorizontal,
   Tag as TagIcon,
   Layers,
-  ChevronUp,
   X,
 } from 'lucide-react'
 import { NuevoProductoModal } from './NuevoProductoModal'
@@ -60,7 +58,8 @@ const formatPesos = (n: number) =>
   new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n)
 
 export function InventarioV2() {
@@ -531,12 +530,36 @@ export function InventarioV2() {
         />
       )}
       {openKit && activaId && (
-        <ModalCrearKit bodegaId={activaId} onClose={() => setOpenKit(false)} />
+        <ModalCrearKit
+          bodegaId={activaId}
+          onClose={() => setOpenKit(false)}
+          onCreated={() => {
+            // El back no emite kit.creado por realtime. La store ya
+            // inserta el kit arriba del array (kitsStore.crear hace
+            // push local), pero por las dudas forzamos un cargar()
+            // para que la disponibilidad (stock) venga fresca del back.
+            void kitsStore.cargar(activaId).catch(() => undefined)
+          }}
+        />
       )}
       {productoDetalle && (
         <ProductoDetalleModal
           producto={productoDetalle}
           onClose={() => setProductoDetalle(null)}
+          onDeleted={() => {
+            // El back ya emite producto.eliminado y el RealtimeProvider
+            // hace recargarSilencioso(), pero si el socket está
+            // reconectando podemos quedarnos con la fila vieja. Forzamos
+            // un cargar() acá como red de seguridad.
+            setProductoDetalle(null)
+            cargar()
+          }}
+          onUpdated={(actualizado) => {
+            // Reflejo el cambio en el modal (precio, nombre, etc.) sin
+            // cerrarlo, y refresco la grilla del padre.
+            setProductoDetalle(actualizado)
+            cargar()
+          }}
         />
       )}
     </div>
@@ -765,26 +788,6 @@ function ProductoFila({
                   Editar
                 </button>
               )}
-              <button
-                onClick={() => {
-                  alert('Registrar entrada (pendiente de wiring)')
-                  onMenuToggle()
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
-              >
-                <ChevronUp size={12} className="text-muted-foreground" />
-                Registrar entrada
-              </button>
-              <button
-                onClick={() => {
-                  alert('Registrar salida (pendiente de wiring)')
-                  onMenuToggle()
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors"
-              >
-                <ChevronDown size={12} className="text-muted-foreground" />
-                Registrar salida
-              </button>
               {puedeEliminar && (
                 <button
                   onClick={onMenuDelete}

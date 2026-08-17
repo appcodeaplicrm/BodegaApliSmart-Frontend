@@ -56,6 +56,7 @@ export type ProductoListItem = {
   marca: { id: string; nombre: string } | null
   unidadMedida: { id: string; nombre: string; abreviatura: string; permiteDecimales: boolean }
   stocks: StockPorBodega[]
+  proveedorIds?: string[]
   _count: { documentos: number; conversiones: number; proveedores: number }
   /** URL de la foto principal del producto (miniatura del listado). */
   fotoUrl?: string | null

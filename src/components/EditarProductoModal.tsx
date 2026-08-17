@@ -370,6 +370,8 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
                   <input
                     type="number"
                     min={0}
+                    step="0.01"
+                    inputMode="decimal"
                     value={precio}
                     onChange={(e) => setPrecio(Number(e.target.value))}
                     className={inputClass}

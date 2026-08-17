@@ -99,6 +99,12 @@ let snapshot: { usuarios: Usuario[]; estado: Estado } = {
   usuarios: [],
   estado: { status: 'idle' },
 }
+/**
+ * Cache del último query usado en `cargarPaginado`. Lo usan los
+ * handlers realtime para hacer un refetch silencioso cuando otro
+ * user crea/edita/elimina un usuario (eventos `usuario.*`).
+ */
+let lastQuery: UsuariosQuery | null = null
 
 const listeners = new Set<() => void>()
 
@@ -164,6 +170,7 @@ export const usuariosStore = {
 
   /** Carga una página de usuarios con filtros opcionales. */
   async cargarPaginado(query: UsuariosQuery): Promise<PageResult<Usuario>> {
+    lastQuery = query
     setEstado({ status: 'cargando' })
     try {
       const params = new URLSearchParams()
@@ -252,6 +259,39 @@ export const usuariosStore = {
   /** Elimina un usuario en el back. */
   async eliminar(id: string): Promise<void> {
     await api.delete(`/usuarios/${id}`)
+  },
+
+  /**
+   * Refetch silencioso: igual a `cargarPaginado` pero NO cambia el
+   * status a 'cargando' (la lista sigue mostrándose, no parpadea).
+   * Usado por los handlers realtime para re-sincronizar la grilla
+   * después de un cambio de otro user.
+   */
+  async recargarSilencioso(): Promise<void> {
+    if (!lastQuery) return
+    try {
+      const params = new URLSearchParams()
+      if (lastQuery.bodegaId) params.set('bodegaId', lastQuery.bodegaId)
+      if (lastQuery.rol) params.set('rol', lastQuery.rol)
+      if (lastQuery.estado) params.set('estado', lastQuery.estado)
+      if (lastQuery.buscar) params.set('buscar', lastQuery.buscar)
+      params.set('page', String(lastQuery.page))
+      params.set('pageSize', String(lastQuery.pageSize))
+      const result = await api.get<PageResult<ApiUsuario>>(`/usuarios?${params.toString()}`)
+      const usuarios = result.data.map(fromApi)
+      if (estado.status === 'listo') {
+        setEstado({
+          status: 'listo',
+          usuarios,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          totalPages: result.totalPages,
+        })
+      }
+    } catch {
+      // Silencioso
+    }
   },
 
   /**

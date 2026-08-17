@@ -27,16 +27,23 @@ type Props = {
   producto: Producto
   onClose: () => void
   onDeleted?: () => void
+  /**
+   * Llamado cuando el usuario edita y guarda el producto desde adentro
+   * del modal. Le pasa el `Producto` ya actualizado. La vista padre lo
+   * usa para refrescar su lista (InventarioV2).
+   */
+  onUpdated?: (actualizado: Producto) => void
 }
 
 const formatPesos = (n: number | string) =>
   new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(typeof n === 'string' ? Number(n) : n)
 
-export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
+export function ProductoDetalleModal({ producto, onClose, onDeleted, onUpdated }: Props) {
   const [full, setFull] = useState<Producto | null>(null)
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -104,6 +111,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted }: Props) {
   function handleSaved(actualizado: Producto) {
     setFull(actualizado)
     setEditing(false)
+    onUpdated?.(actualizado)
   }
 
   const p = full ?? (producto as unknown as Producto)

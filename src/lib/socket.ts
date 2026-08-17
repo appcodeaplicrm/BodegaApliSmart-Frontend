@@ -117,15 +117,37 @@ export function setActiveBodega(bodegaId: string | null): void {
 // ── Socket lifecycle ───────────────────────────────────────
 
 /**
- * Resuelve la URL del WebSocket. En dev apunta al back en :3001, en
- * prod se usa la misma base (Render proxy).
+ * Detecta si el front está corriendo en local (Vite dev server). En
+ * ese caso usamos el proxy de Vite (`/socket.io` → `localhost:3001`)
+ * y NO apuntamos directo al back, para no romper el handshake del
+ * WebSocket (el back escucha en `/socket.io`, no en `/api/socket.io`).
+ *
+ * En producción (aaPanel), el front apunta a la URL del back con
+ * `path: '/api/socket.io'` y el reverse proxy se encarga del rewrite.
+ */
+function isLocalDev(): boolean {
+  if (typeof window === 'undefined') return false
+  const { hostname } = window.location
+  return hostname === 'localhost' || hostname === '127.0.0.1'
+}
+
+/**
+ * Resuelve la URL del WebSocket.
+ *
+ *  - LOCAL: mismo origin que la página (Vite, :5173). El proxy de
+ *    Vite reescribe `/socket.io` → `localhost:3001/socket.io` y
+ *    mantiene el upgrade a WebSocket (`ws: true`).
+ *  - PROD: si hay `VITE_API_URL` apuntando al back, usa ese origin.
+ *    Si no, usa el origin de la página (caso típico de aaPanel donde
+ *    front y back comparten dominio detrás de un reverse proxy).
  */
 function getSocketUrl(): string {
   if (typeof window === 'undefined') return ''
+  if (isLocalDev()) {
+    // Mismo origin que Vite. El proxy se encarga de redirigir al back.
+    return window.location.origin
+  }
   const envBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
-  // VITE_API_URL puede terminar en /api. Socket.IO interpretaría ese
-  // segmento como el namespace "/api", pero el gateway usa el namespace
-  // raíz. La ruta HTTP real se configura aparte mediante `path`.
   if (envBase) {
     try {
       return new URL(envBase, window.location.origin).origin
@@ -133,11 +155,17 @@ function getSocketUrl(): string {
       return window.location.origin
     }
   }
-  const { protocol, hostname } = window.location
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `${protocol}//${hostname}:3001`
-  }
-  return `${protocol}//${hostname}`
+  return window.location.origin
+}
+
+/**
+ * Path HTTP que usa Socket.IO. En local es `/socket.io` (Vite proxia
+ * tal cual al back). En prod es `/api/socket.io` (aaPanel reescribe
+ * `/api/*` → `/` antes de pasarlo al back, así que el back termina
+ * recibiendo `/socket.io`).
+ */
+function getSocketPath(): string {
+  return isLocalDev() ? '/socket.io' : '/api/socket.io'
 }
 
 /**
@@ -161,7 +189,7 @@ export function getSocket(): Socket | null {
   setStatus('connecting')
 
   socket = io(getSocketUrl(), {
-    path: '/api/socket.io',
+    path: getSocketPath(),
     auth: { token, bodegas: currentBodegas },
     // Inicia con polling y, si el proxy lo permite, asciende a WebSocket.
     // Si el upgrade falla, Socket.IO mantiene la conexión por polling.

@@ -8,6 +8,12 @@ export type Ubicacion = {
 }
 
 const cachePorBodega = new Map<string, Ubicacion[]>()
+/**
+ * Versión del cache. Cuando el realtime notifica un cambio en
+ * ubicaciones, incrementamos este contador para que el hook
+ * `useUbicaciones` invalide el cache y vuelva a fetchear.
+ */
+let cacheVersion = 0
 
 async function listarPorBodega(bodegaId: string): Promise<Ubicacion[]> {
   return api.get<Ubicacion[]>(`/ubicaciones?bodegaId=${encodeURIComponent(bodegaId)}`)
@@ -26,11 +32,18 @@ async function eliminar(bodegaId: string, id: string): Promise<void> {
   if (arr) cachePorBodega.set(bodegaId, arr.filter((u) => u.id !== id))
 }
 
-export const ubicacionesService = { listarPorBodega, crear, eliminar }
+/** Invalida el cache de la bodega (y de paso todas). Usado por realtime. */
+function invalidarCache() {
+  cachePorBodega.clear()
+  cacheVersion += 1
+}
+
+export const ubicacionesService = { listarPorBodega, crear, eliminar, invalidarCache }
 
 /**
  * Hook que carga ubicaciones de una bodega con cache estable.
- * Devuelve un objeto con status + datos. Re-carga solo si cambia bodegaId.
+ * Devuelve un objeto con status + datos. Re-carga solo si cambia bodegaId
+ * o si `cacheVersion` cambia (forzado por realtime).
  */
 export function useUbicaciones(bodegaId: string | null) {
   const [state, setState] = useState<{
@@ -64,7 +77,7 @@ export function useUbicaciones(bodegaId: string | null) {
     return () => {
       cancelado = true
     }
-  }, [bodegaId])
+  }, [bodegaId, cacheVersion])
 
   return state
 }

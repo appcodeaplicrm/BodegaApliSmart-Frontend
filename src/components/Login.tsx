@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react'
 import { authStore } from '../store/auth'
 import { ApiError } from '../lib/api'
@@ -13,12 +13,40 @@ type LoginProps = {
   onLoginSuccess: (destino?: string) => void
 }
 
+const LOGIN_BACKGROUNDS = [
+  '/login/inventario-almacen.avif',
+  '/login/almacen-logistico.jpg',
+]
+
+const LOGIN_PARTICLES = [
+  { left: '7%', top: '14%', size: 3, delay: '-2s', duration: '13s' },
+  { left: '18%', top: '72%', size: 5, delay: '-8s', duration: '17s' },
+  { left: '27%', top: '34%', size: 2, delay: '-5s', duration: '12s' },
+  { left: '38%', top: '88%', size: 4, delay: '-11s', duration: '18s' },
+  { left: '46%', top: '18%', size: 3, delay: '-7s', duration: '15s' },
+  { left: '57%', top: '63%', size: 2, delay: '-1s', duration: '11s' },
+  { left: '66%', top: '29%', size: 5, delay: '-13s', duration: '19s' },
+  { left: '75%', top: '82%', size: 3, delay: '-4s', duration: '14s' },
+  { left: '86%', top: '45%', size: 4, delay: '-9s', duration: '16s' },
+  { left: '94%', top: '69%', size: 2, delay: '-6s', duration: '12s' },
+  { left: '13%', top: '48%', size: 2, delay: '-10s', duration: '15s' },
+  { left: '82%', top: '11%', size: 3, delay: '-3s', duration: '17s' },
+]
+
 export function Login({ onBack, onLoginSuccess }: LoginProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [backgroundIndex, setBackgroundIndex] = useState(0)
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setBackgroundIndex((current) => (current + 1) % LOGIN_BACKGROUNDS.length)
+    }, 6000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -91,7 +119,7 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
         if (err.status === 401) {
           setError('Credenciales inválidas.')
         } else if (err.status === 429) {
-          setError('Demasiados intentos. Esperá un minuto.')
+          setError(err.message || 'Demasiados intentos. Intenta nuevamente más tarde.')
         } else {
           setError(err.message)
         }
@@ -105,80 +133,87 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col lg:flex-row">
-      <aside className="hidden lg:flex lg:w-1/2 relative border-r border-border p-12 flex-col justify-between overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
-        <div className="absolute top-[-80px] left-[-80px] w-72 h-72 rounded-full bg-primary opacity-10 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-[-60px] right-[-60px] w-56 h-56 rounded-full bg-secondary opacity-10 blur-3xl pointer-events-none" />
+      <aside className="relative hidden overflow-hidden border-r border-border p-12 lg:flex lg:w-1/2 lg:flex-col lg:justify-between">
+        {LOGIN_BACKGROUNDS.map((src, index) => (
+          <img
+            key={src}
+            src={src}
+            alt=""
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-in-out ${
+              backgroundIndex === index ? 'scale-100 opacity-100' : 'scale-105 opacity-0'
+            }`}
+          />
+        ))}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/65" />
 
-        <div className="relative z-10">
+        <div className="relative z-10 flex items-start justify-between gap-6">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 min-h-[44px] text-xs text-muted-foreground hover:text-foreground transition-colors mb-8"
+            className="flex min-h-[44px] items-center gap-2 text-xs text-white/70 transition-colors hover:text-white"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
             <ArrowLeft size={14} />
             VOLVER AL SITIO
           </button>
 
-          <div className="flex items-center">
-            <span
-              className="text-foreground text-2xl tracking-wider"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-            >
-              BodegaApliSmart
-            </span>
-          </div>
+          <LoginBrand />
         </div>
 
-        <div className="relative z-10">
+        <div className="relative z-10 flex flex-col items-start">
           <h1
-            className="text-5xl xl:text-7xl uppercase leading-none text-foreground"
+            className="text-5xl uppercase leading-none text-white drop-shadow-lg xl:text-7xl"
             style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
           >
             tu bodega
             <br />
             bajo <span className="text-primary">control</span>
           </h1>
-
-          <p
-            className="mt-5 text-sm text-muted-foreground max-w-xs leading-relaxed"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}
-          >
-            opera entradas, salidas y picking desde cualquier dispositivo con la
-            plataforma que ya usan +1.200 bodegas en latinoamérica.
-          </p>
-        </div>
-
-        <div className="relative z-10">
-          <div className="pt-6 border-t border-border grid grid-cols-3 gap-4">
-            <MiniStat value="1.2K+" label="bodegas" />
-            <MiniStat value="98.7%" label="precisión" />
-            <MiniStat value="24/7" label="operación" />
-          </div>
         </div>
       </aside>
 
       <main
-        className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12"
+        className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-8 sm:px-6 sm:py-12"
         style={{ paddingBottom: 'max(3rem, env(safe-area-inset-bottom))' }}
       >
-        <div className="flex lg:hidden items-center mb-10">
-          <span
-            className="text-foreground text-2xl tracking-wider"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-          >
-            BodegaApliSmart
-          </span>
+        <svg
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] w-full opacity-[0.12]"
+          viewBox="0 0 1440 320"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            fill="#ff5500"
+            d="M0,192L60,197.3C120,203,240,213,360,208C480,203,600,181,720,154.7C840,128,960,96,1080,90.7C1200,85,1320,107,1380,117.3L1440,128L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"
+          />
+        </svg>
+
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+          {LOGIN_PARTICLES.map((particle, index) => (
+            <span
+              key={`${particle.left}-${particle.top}`}
+              className={`login-particle absolute rounded-full ${
+                index % 4 === 0
+                  ? 'bg-secondary/55 shadow-[0_0_10px_rgba(171,247,104,0.35)]'
+                  : 'bg-primary/60 shadow-[0_0_10px_rgba(232,89,63,0.4)]'
+              }`}
+              style={{
+                left: particle.left,
+                top: particle.top,
+                width: particle.size,
+                height: particle.size,
+                animationDelay: particle.delay,
+                animationDuration: particle.duration,
+              }}
+            />
+          ))}
         </div>
 
-        <div className="max-w-sm w-full">
+        <div className="relative z-10 mb-10 lg:hidden">
+          <LoginBrand />
+        </div>
+
+        <div className="relative z-10 max-w-sm w-full">
           <button
             onClick={onBack}
             className="lg:hidden self-start flex items-center gap-2 min-h-[44px] text-xs text-muted-foreground hover:text-foreground transition-colors mb-6"
@@ -342,21 +377,11 @@ export function Login({ onBack, onLoginSuccess }: LoginProps) {
   )
 }
 
-function MiniStat({ value, label }: { value: string; label: string }) {
+function LoginBrand() {
   return (
-    <div>
-      <div
-        className="text-2xl text-foreground"
-        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}
-      >
-        {value}
-      </div>
-      <div
-        className="text-xs text-muted-foreground uppercase tracking-widest mt-1"
-        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-      >
-        {label}
-      </div>
+    <div className="flex items-center gap-1">
+      <span className="font-brand text-2xl tracking-wide text-primary">Bodega</span>
+      <span className="font-brand text-2xl tracking-wide text-foreground">ApliSmart</span>
     </div>
   )
 }
