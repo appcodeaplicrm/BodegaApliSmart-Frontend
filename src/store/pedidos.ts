@@ -75,6 +75,9 @@ export type PedidoItem = {
   kitId: string | null
   /** Viene como string desde Prisma Decimal */
   cantidad: number
+  unidadSolicitadaId?: string | null
+  factorConversion?: number | null
+  cantidadBase?: number | null
   producto: {
     id: string
     codigo: string
@@ -133,12 +136,54 @@ export type Pedido = {
   canceladaPorId: string | null
   canceladaAt: string | null
   motivoCancelacion: string | null
+  reporteUso?: { id: string; estado: 'Enviado' | 'Vencido'; fechaLimite: string; enviadoAt: string } | null
   estado: { id: string; nombre: EstadoPedido; createdAt: string }
   /** Traído por el back en el `include` del listar/findOne. */
   operador?: { id: string; nombre: string } | null
   aprobadaPor?: { id: string; nombre: string } | null
   canceladaPor?: { id: string; nombre: string } | null
   items: PedidoItem[]
+}
+
+export type ReporteUsoEvidencia = {
+  id: string
+  fotoKey: string
+  imageUrl: string
+  mimeType: string
+  latitud: number
+  longitud: number
+  precisionMetros: number | null
+  capturadaAt: string
+  registradaAt: string
+}
+
+export type ReporteUsoSerial = {
+  id: string
+  entregaItemId: string
+  productoId: string
+  serial: string
+  latitud: number | null
+  longitud: number | null
+  producto: { id: string; nombre: string; codigo: string }
+}
+
+export type ReporteUso = {
+  id: string
+  pedidoId: string
+  descripcion: string
+  estado: 'Enviado' | 'Vencido'
+  fechaLimite: string
+  enviadoAt: string
+  tecnico: { id: string; nombre: string }
+  evidencias: ReporteUsoEvidencia[]
+  seriales: ReporteUsoSerial[]
+}
+
+export type EstadoReporteUso = {
+  reporte: ReporteUso | null
+  fechaLimite: string
+  vencido: boolean
+  puedeSubir: boolean
 }
 
 /** Forma liviana que consume la UI (la lista necesita solo lo mínimo). */
@@ -197,6 +242,7 @@ export type PedidoListItem = {
   canceladaPorId: string | null
   canceladaPorNombre: string | null
   motivoCancelacion: string | null
+  reporteUso?: { id: string; estado: 'Enviado' | 'Vencido'; fechaLimite: string; enviadoAt: string } | null
 }
 
 /* ─── Helpers ─────────────────────────────────── */
@@ -318,6 +364,7 @@ export function toListItem(p: Pedido): PedidoListItem {
     canceladaPorId: p.canceladaPorId,
     canceladaPorNombre: p.canceladaPor?.nombre ?? null,
     motivoCancelacion: p.motivoCancelacion,
+    reporteUso: p.reporteUso ?? null,
   }
 }
 
@@ -412,6 +459,31 @@ export const pedidosStore = {
   /** Trae el detalle completo de un pedido (con items.entregaItems). */
   async findOne(id: string): Promise<Pedido> {
     return api.get<Pedido>(`/pedidos/${encodeURIComponent(id)}`)
+  },
+
+  async obtenerReporteUso(id: string): Promise<EstadoReporteUso> {
+    return api.get<EstadoReporteUso>(`/pedidos/${encodeURIComponent(id)}/reporte-uso`)
+  },
+
+  async crearReporteUso(id: string, input: {
+    descripcion: string
+    evidencias: Array<{
+      fotoKey: string
+      mimeType: string
+      latitud: number
+      longitud: number
+      precisionMetros?: number
+      capturadaAt: string
+    }>
+    seriales: Array<{
+      entregaItemId: string
+      productoId: string
+      serial: string
+      latitud?: number
+      longitud?: number
+    }>
+  }): Promise<ReporteUso> {
+    return api.post<ReporteUso>(`/pedidos/${encodeURIComponent(id)}/reporte-uso`, input)
   },
 
   /** Carga una página de pedidos con filtros opcionales. */

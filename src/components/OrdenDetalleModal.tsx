@@ -7,6 +7,7 @@ import {
   XCircle,
   Send,
   PackageOpen,
+  FileCheck2,
 } from 'lucide-react'
 import { pedidosStore, type Pedido, type PedidoListItem } from '../store/pedidos'
 import { useBodegas } from '../store/bodegas'
@@ -14,6 +15,7 @@ import { useAuth } from '../store/auth'
 import { downloadPedidoPDF, PedidoNoEntregadoError } from '../lib/pdf'
 import { imageUrl } from '../lib/apiBase'
 import { Modal } from './Modal'
+import { ReporteUsoModal } from './ReporteUsoModal'
 
 type OrdenDetalleModalProps = {
   pedido: PedidoListItem
@@ -55,6 +57,7 @@ export function OrdenDetalleModal({
   const [errorCarga, setErrorCarga] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [reporteOpen, setReporteOpen] = useState(false)
 
   const bodega =
     bodegasState.status === 'listo'
@@ -164,6 +167,18 @@ export function OrdenDetalleModal({
       size="lg"
       footer={
         <div className="space-y-2">
+          {completo?.estado.nombre === 'Entregado' && (
+            <button
+              type="button"
+              onClick={() => setReporteOpen(true)}
+              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 py-2.5 border border-primary/50 text-primary text-sm font-semibold hover:bg-primary/5 transition-colors"
+            >
+              <FileCheck2 size={14} />
+              {completo.operadorId === (auth.status === 'autenticado' ? auth.sesion.usuario.id : null)
+                ? 'Subir / ver reporte de uso'
+                : 'Ver reporte de uso'}
+            </button>
+          )}
           {accionContextual && (
             <button
               type="button"
@@ -375,6 +390,13 @@ export function OrdenDetalleModal({
           )}
         </div>
       </div>
+      {reporteOpen && completo && (
+        <ReporteUsoModal
+          pedido={completo}
+          onClose={() => setReporteOpen(false)}
+          onCreated={() => void pedidosStore.recargarSilencioso()}
+        />
+      )}
     </Modal>
   )
 }

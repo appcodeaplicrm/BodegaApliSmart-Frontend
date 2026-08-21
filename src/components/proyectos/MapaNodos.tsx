@@ -85,7 +85,7 @@ export function MapaNodos({
     if (!containerRef.current || mapRef.current) return
 
     const map = L.map(containerRef.current, {
-      center: [4.711, -74.0721],
+      center: [-0.1807, -78.4678],
       zoom: 12,
       zoomControl: true,
     })

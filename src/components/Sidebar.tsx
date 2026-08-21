@@ -47,6 +47,7 @@ import {
   Tag,
   Award,
   MapPin,
+  Map as MapIcon,
   MessageCircle,
 } from 'lucide-react'
 
@@ -148,6 +149,13 @@ const general: NavItem[] = [
         label: 'Secciones de la bodega',
         icon: MapPin,
         permiso: 'inventario.ver',
+      },
+      {
+        key: 'productos-entregados',
+        path: '/inventario/productos-entregados',
+        label: 'Productos entregados',
+        icon: MapIcon,
+        permiso: 'inventario.productos-entregados.ver',
       },
     ],
   },

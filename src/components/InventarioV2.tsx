@@ -608,6 +608,8 @@ function ProductoFila({
   puedeEliminar: boolean
   formatPesos: (n: number) => string
 }) {
+  const presentacion = p.conversiones?.find((conversion) => conversion.unidadDestino.id === p.unidadMedida.id)
+  const stockPresentacion = presentacion ? stock / Number(presentacion.factorConversion) : null
   return (
     <>
       {/* ─── MOBILE: 4 columnas + chevron, toda la fila es el trigger ─── */}
@@ -652,7 +654,7 @@ function ProductoFila({
             className="text-sm font-semibold"
             style={{ fontFamily: "'JetBrains Mono', monospace", color: c.text }}
           >
-            {stock}
+            {stockPresentacion == null ? stock : `${stockPresentacion.toLocaleString('es-EC', { maximumFractionDigits: 3 })} ${presentacion?.unidadOrigen.abreviatura}`}
           </div>
           <div
             className="text-[10px] text-muted-foreground"
@@ -725,7 +727,9 @@ function ProductoFila({
         </span>
         {/* Stock + mini barra */}
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${c.text}`}>{stock}</span>
+          <span className={`text-xs font-medium ${c.text}`} title={presentacion ? `${stock} ${p.unidadMedida.abreviatura} en total` : undefined}>
+            {stockPresentacion == null ? stock : stockPresentacion.toLocaleString('es-EC', { maximumFractionDigits: 3 })}
+          </span>
           <div className="w-10 h-1 rounded-full bg-muted overflow-hidden shrink-0">
             <div
               className="h-full rounded-full transition-all"
@@ -738,14 +742,14 @@ function ProductoFila({
           className="text-muted-foreground"
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
         >
-          {p.stockMinimo}
+          {presentacion ? (Number(p.stockMinimo) / Number(presentacion.factorConversion)).toLocaleString('es-EC', { maximumFractionDigits: 3 }) : p.stockMinimo}
         </span>
         {/* Unidad */}
         <span
           className="text-muted-foreground"
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
         >
-          {p.unidadMedida.abreviatura}
+          {presentacion?.unidadOrigen.abreviatura ?? p.unidadMedida.abreviatura}
         </span>
         {/* Precio */}
         <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>

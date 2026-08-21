@@ -29,6 +29,7 @@ export type ModuloKey =
   | 'tecnicos'
   | 'reportes'
   | 'valores'
+  | 'evidencias'
   | 'admin'
 
 export const ACCIONES = ['ver', 'crear', 'editar', 'eliminar'] as const
@@ -51,7 +52,7 @@ export type SubmoduloDef = {
 export type ModuloDef = {
   key: ModuloKey
   label: string
-  acciones: readonly Accion[]
+  acciones: readonly (Accion | AccionCustom)[]
   submodulos?: readonly SubmoduloDef[]
 }
 
@@ -63,6 +64,7 @@ export const MODULOS: readonly ModuloDef[] = [
     { key: 'marcas', label: 'Marcas' },
     { key: 'proveedores', label: 'Proveedores' },
     { key: 'ubicaciones', label: 'Secciones de la bodega' },
+    { key: 'productos-entregados', label: 'Productos entregados', acciones: ['ver'] },
   ]},
   { key: 'movimientos', label: 'Movimientos', acciones: ['ver', 'crear', 'editar', 'eliminar'] },
   { key: 'despachos', label: 'Despachos', acciones: ['ver', 'crear', 'editar', 'eliminar'] },
@@ -141,6 +143,7 @@ export const MODULOS: readonly ModuloDef[] = [
     label: 'Valores monetarios',
     acciones: ['ver'],
   },
+  { key: 'evidencias', label: 'Evidencias fotográficas', acciones: ['subir'] },
 ] as const
 
 export const MODULO_LABELS: Record<ModuloKey, string> = MODULOS.reduce(
@@ -167,6 +170,7 @@ export const ACCION_LABELS: Record<Accion, string> = {
  * Si agregás una acción custom nueva, agregá su label acá también.
  */
 export const ACCION_LABELS_CUSTOM: Record<string, string> = {
+  subir: 'Subir imágenes existentes',
   // tecnicos.proyectos
   'tecnico.asignar': 'Asignar técnicos',
   'producto.inicial': 'Dotación inicial',
@@ -237,7 +241,7 @@ export function todasLasKeys(): string[] {
     if (!m.submodulos || m.submodulos.length === 0) {
       for (const a of m.acciones) out.push(`${m.key}.${a}`)
     } else {
-      const accionesPadre = new Set<Accion>(['ver', ...m.acciones])
+      const accionesPadre = new Set<string>(['ver', ...m.acciones])
       for (const a of accionesPadre) out.push(`${m.key}.${a}`)
       for (const s of m.submodulos) {
         // Antes (BUG): solo se iteraban las 4 acciones base (`ACCIONES`),

@@ -15,7 +15,7 @@
  *     y guardamos el `key` retornado
  *  3. Cuando hace submit, mandamos el array de `key` al back
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Camera,
@@ -23,9 +23,11 @@ import {
   X,
 } from 'lucide-react'
 import { Modal } from '../Modal'
+import { TomarFotoModal } from '../checklist/TomarFotoModal'
 import { useBodegaActiva } from '../../store/bodegaActiva'
 import { useAuth } from '../../store/auth'
 import { crearAvance, subirFotoAvance, listarAvances } from './api'
+import { useCapturaEvidencia } from '../../hooks/useCapturaEvidencia'
 import type { AvanceFoto } from './types'
 
 type Props = {
@@ -86,6 +88,8 @@ export function RegistrarAvanceModal({
   onClose,
   onCreated,
 }: Props) {
+  const evidencia = useCapturaEvidencia()
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const auth = useAuth()
   const bodegaId = useBodegaActiva()
   const userId = auth.status === 'autenticado' ? auth.sesion.usuario.id : null
@@ -107,6 +111,7 @@ export function RegistrarAvanceModal({
   )
   const [descripcion, setDescripcion] = useState('')
   const [fotos, setFotos] = useState<FotoSubiendo[]>([])
+  const [camaraAbierta, setCamaraAbierta] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -164,15 +169,20 @@ export function RegistrarAvanceModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fotos.length])
 
-  function handleAddFiles(files: FileList | null) {
-    if (!files || files.length === 0) return
-    const nuevos: FotoSubiendo[] = Array.from(files).map((file) => ({
+  function agregarArchivos(files: File[]) {
+    if (files.length === 0) return
+    const nuevos: FotoSubiendo[] = files.map((file) => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
       preview: URL.createObjectURL(file),
       status: 'subiendo',
     }))
     setFotos((prev) => [...prev, ...nuevos].slice(0, 20))
+  }
+
+  function handleAddFiles(files: FileList | null) {
+    if (!files) return
+    agregarArchivos(Array.from(files))
   }
 
   function handleRemoveFoto(id: string) {
@@ -219,6 +229,7 @@ export function RegistrarAvanceModal({
   }
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -452,14 +463,11 @@ export function RegistrarAvanceModal({
             <label className="block text-xs font-medium text-foreground mb-1">
               Fotos ({fotos.length}/20)
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => handleAddFiles(e.target.files)}
-              className="block w-full text-xs text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:border-0 file:bg-foreground file:text-background file:text-xs file:font-medium file:cursor-pointer hover:file:opacity-90"
-              style={{ borderRadius: '0.25rem' }}
-            />
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setCamaraAbierta(true)} className="min-h-[44px] flex-1 border border-border text-xs">Tomar foto</button>
+              {evidencia.puedeSubir && <button type="button" onClick={() => uploadInputRef.current?.click()} className="min-h-[44px] flex-1 border border-border text-xs">Subir foto</button>}
+            </div>
+            {evidencia.puedeSubir && <input ref={uploadInputRef} type="file" accept="image/*" multiple onChange={(e) => handleAddFiles(e.target.files)} className="hidden" />}
             {fotos.length > 0 && (
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-2">
                 {fotos.map((f) => (
@@ -498,5 +506,20 @@ export function RegistrarAvanceModal({
           </div>
       </div>
     </Modal>
+    {camaraAbierta && (
+      <TomarFotoModal
+        label="Avance del proyecto"
+        onClose={() => setCamaraAbierta(false)}
+        onCapture={(blob) => {
+          const tipo = blob.type || 'image/jpeg'
+          const extension = tipo.includes('png') ? 'png' : 'jpg'
+          agregarArchivos([
+            new File([blob], `avance-${Date.now()}.${extension}`, { type: tipo }),
+          ])
+          setCamaraAbierta(false)
+        }}
+      />
+    )}
+    </>
   )
 }

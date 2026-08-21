@@ -55,6 +55,7 @@ export type ProductoListItem = {
   categoria: { id: string; nombre: string }
   marca: { id: string; nombre: string } | null
   unidadMedida: { id: string; nombre: string; abreviatura: string; permiteDecimales: boolean }
+  conversiones: ConversionUnidad[]
   stocks: StockPorBodega[]
   proveedorIds?: string[]
   _count: { documentos: number; conversiones: number; proveedores: number }
@@ -85,6 +86,8 @@ export type CreateProductoInput = {
   categoriaNombre: string
   marcaId?: string
   unidadMedidaId: string
+  unidadPresentacionId?: string
+  cantidadContenido?: number
   bodegaId?: string
   ubicacionId?: string
   activo?: boolean
@@ -104,6 +107,8 @@ export type UpdateProductoInput = {
   categoriaNombre?: string
   marcaId?: string
   unidadMedidaId?: string
+  unidadPresentacionId?: string
+  cantidadContenido?: number
   bodegaId?: string
   activo?: boolean
   stockCantidad?: number

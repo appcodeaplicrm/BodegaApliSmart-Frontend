@@ -41,6 +41,7 @@ const RUTAS_POR_PERMISO: ReadonlyArray<{
   { permiso: 'inventario.marcas.ver', ruta: '/inventario/marcas' },
   { permiso: 'inventario.proveedores.ver', ruta: '/inventario/proveedores' },
   { permiso: 'inventario.ubicaciones.ver', ruta: '/inventario/ubicaciones' },
+  { permiso: 'inventario.productos-entregados.ver', ruta: '/inventario/productos-entregados' },
   { permiso: 'movimientos.ver', ruta: '/movimientos' },
   { permiso: 'despachos.ver', ruta: '/despachos' },
   { permiso: 'kits.ver', ruta: '/inventario' }, // kits vive dentro de inventario

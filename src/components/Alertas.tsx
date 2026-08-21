@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   AlertTriangle,
   CircleAlert,
@@ -19,6 +19,7 @@ import { useAuth } from '../store/auth'
 import { PageHeader } from './PageHeader'
 import { Portal } from './Portal'
 import { imageUrl } from '../lib/apiBase'
+import { useCapturaEvidencia } from '../hooks/useCapturaEvidencia'
 
 export function Alertas() {
   const auth = useAuth()
@@ -279,10 +280,13 @@ function AtenderAlertaModal({
   onClose: () => void
   onConfirm: (cantidad: number, evidencia: File) => Promise<void>
 }) {
+  const politicaEvidencia = useCapturaEvidencia()
   const [cantidad, setCantidad] = useState('')
   const proveedorAsignado = alerta.producto.proveedores?.[0]?.proveedor ?? null
   const proveedorId = proveedorAsignado?.id ?? ''
   const [evidencia, setEvidencia] = useState<File | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
 
@@ -399,24 +403,31 @@ function AtenderAlertaModal({
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                 Evidencia del pedido · obligatoria
               </div>
-              <label className="mt-2 flex min-h-44 cursor-pointer flex-col items-center justify-center overflow-hidden border border-dashed border-border bg-background text-center transition-colors hover:border-secondary/70">
+              <div className="mt-2 flex min-h-44 flex-col items-center justify-center overflow-hidden border border-dashed border-border bg-background text-center">
                 {preview ? (
                   <img src={preview} alt="Evidencia seleccionada" className="max-h-64 w-full object-contain" />
                 ) : (
                   <div className="p-8">
                     <div className="mx-auto flex h-11 w-11 items-center justify-center bg-secondary/15 text-secondary"><Camera size={20} /></div>
-                    <div className="mt-3 text-sm font-medium text-foreground">Subir foto del pedido</div>
+                    <div className="mt-3 text-sm font-medium text-foreground">Evidencia del pedido</div>
                     <div className="mt-1 text-xs text-muted-foreground">PNG, JPG o WEBP · máximo 10 MB</div>
                   </div>
                 )}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button type="button" disabled={guardando} onClick={() => cameraInputRef.current?.click()} className="min-h-[44px] flex-1 border border-border text-sm inline-flex items-center justify-center gap-2"><Camera size={14} />Tomar foto</button>
+                {politicaEvidencia.puedeSubir && <button type="button" disabled={guardando} onClick={() => uploadInputRef.current?.click()} className="min-h-[44px] flex-1 border border-border text-sm inline-flex items-center justify-center gap-2"><Upload size={14} />Subir foto</button>}
                 <input
+                  ref={cameraInputRef}
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
+                  capture="environment"
                   className="hidden"
                   disabled={guardando}
                   onChange={(event) => setEvidencia(event.target.files?.[0] ?? null)}
                 />
-              </label>
+                {politicaEvidencia.puedeSubir && <input ref={uploadInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={guardando} onChange={(event) => setEvidencia(event.target.files?.[0] ?? null)} />}
+              </div>
               {evidencia && <div className="mt-2 truncate text-xs text-muted-foreground">{evidencia.name}</div>}
             </div>
 

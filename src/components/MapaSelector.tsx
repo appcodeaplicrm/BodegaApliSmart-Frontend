@@ -23,7 +23,7 @@ type Props = {
   onChange: (direccion: string, coords: Coords | null) => void
 }
 
-const DEFAULT_CENTER: Coords = { lat: 4.711, lng: -74.0721 } // Bogotá por defecto
+const DEFAULT_CENTER: Coords = { lat: -0.1807, lng: -78.4678 } // Quito, Ecuador por defecto
 const DEFAULT_ZOOM = 12
 
 /**
@@ -196,7 +196,7 @@ export function MapaSelector({ value = '', onChange }: Props) {
                 void handleSearch()
               }
             }}
-            placeholder="Buscá una dirección (ej: Calle 100 #15-20, Bogotá)"
+            placeholder="Buscá una dirección (ej: Av. Amazonas, Quito)"
             className="w-full pl-9 pr-3 py-2.5 bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 transition-colors"
             style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
           />

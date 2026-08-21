@@ -17,6 +17,7 @@ import { uploadsService } from '../store/productos'
 import { devolucionesStore, type Devolucion } from '../store/devoluciones'
 import { ApiError } from '../lib/api'
 import { Modal } from './Modal'
+import { useCapturaEvidencia } from '../hooks/useCapturaEvidencia'
 
 type Step = {
   devolucionItemId: string
@@ -62,6 +63,7 @@ function buildSteps(d: Devolucion, rol: WizardRol): Step[] {
  * o rechazo con motivo.
  */
 export function DevolucionWizard({ devolucion, rol, onClose, onResolved }: Props) {
+  const evidencia = useCapturaEvidencia()
   const [stepIdx, setStepIdx] = useState(0)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
@@ -478,7 +480,6 @@ export function DevolucionWizard({ devolucion, rol, onClose, onResolved }: Props
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleFile}
           className="hidden"
         />
@@ -491,16 +492,16 @@ export function DevolucionWizard({ devolucion, rol, onClose, onResolved }: Props
                 className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
                 style={{ borderRadius: '0.25rem' }}
               >
-                <CameraIcon size={14} /> Abrir cámara
+                <CameraIcon size={14} /> Tomar foto
               </button>
-              <button
+              {evidencia.puedeSubir && <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
                 style={{ borderRadius: '0.25rem' }}
               >
                 <Camera size={14} /> Subir foto
-              </button>
+              </button>}
             </>
           )}
           {cameraOn && (

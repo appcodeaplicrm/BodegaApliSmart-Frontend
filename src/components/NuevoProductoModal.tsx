@@ -74,6 +74,8 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
   const [stockInicial, setStockInicial] = useState(0)
   const [stockInicialUnidadId, setStockInicialUnidadId] = useState<string | null>(null)
   const [unidadMedidaId, setUnidadMedidaId] = useState<string | null>(null)
+  const [unidadPresentacionId, setUnidadPresentacionId] = useState<string | null>(null)
+  const [cantidadContenido, setCantidadContenido] = useState(1)
   const [ubicacionId, setUbicacionId] = useState<string | null>(null)
 
   const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string }>>([])
@@ -153,8 +155,9 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
     if (!stockInicialUnidadId && unidadesState.status === 'listo' && unidadesState.unidades.length) {
       setStockInicialUnidadId(unidadesState.unidades[0].id)
       if (!unidadMedidaId) setUnidadMedidaId(unidadesState.unidades[0].id)
+      if (!unidadPresentacionId) setUnidadPresentacionId(unidadesState.unidades[0].id)
     }
-  }, [stockInicialUnidadId, unidadMedidaId, unidadesState])
+  }, [stockInicialUnidadId, unidadMedidaId, unidadPresentacionId, unidadesState])
 
   /**
    * Sincronizar la unidad del Stock Inicial con la Unidad Base.
@@ -258,6 +261,10 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
       setError('Elegí la unidad de medida base del producto.')
       return
     }
+    if (unidadPresentacionId && unidadPresentacionId !== unidadMedidaId && cantidadContenido <= 0) {
+      setError('Indicá cuánto contiene cada presentación del producto.')
+      return
+    }
     if (!puedeEditar) {
       setError('No tenés permiso para crear productos.')
       return
@@ -287,14 +294,16 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
           categorias.find((c) => c.id === categoriaId)?.nombre ?? '',
         marcaId: marcaId || undefined,
         unidadMedidaId,
+        unidadPresentacionId: unidadPresentacionId ?? unidadMedidaId,
+        cantidadContenido: unidadPresentacionId && unidadPresentacionId !== unidadMedidaId ? cantidadContenido : undefined,
         bodegaId,
         ubicacionId: ubicacionId || undefined,
         precio: precio > 0 ? precio : undefined,
-        stockMinimo: stockMinimo > 0 ? stockMinimo : undefined,
-        stockMaximo: stockMaximo > 0 ? stockMaximo : undefined,
+        stockMinimo: stockMinimo > 0 ? stockMinimo * (unidadPresentacionId !== unidadMedidaId ? cantidadContenido : 1) : undefined,
+        stockMaximo: stockMaximo > 0 ? stockMaximo * (unidadPresentacionId !== unidadMedidaId ? cantidadContenido : 1) : undefined,
         stockInicial: stockInicial > 0 ? stockInicial : undefined,
         stockInicialUnidadId:
-          stockInicial > 0 ? stockInicialUnidadId ?? unidadMedidaId : undefined,
+          stockInicial > 0 ? stockInicialUnidadId ?? unidadPresentacionId ?? unidadMedidaId : undefined,
         proveedores: proveedorId ? [{ proveedorId, precioCompra: 0 }] : undefined,
         // Política de devolución.
         admiteDevolucion,
@@ -552,14 +561,19 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
           {/* ─── Unidad y stock ─── */}
           <Section title="Unidad de medida y stock" icon={Ruler}>
             <div className="space-y-3">
-              <Field label="Unidad base" required icon={Ruler}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Field label="Presentación en inventario" required icon={Ruler}>
                 <select
-                  value={unidadMedidaId ?? ''}
-                  onChange={(e) => setUnidadMedidaId(e.target.value)}
+                  value={unidadPresentacionId ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setUnidadPresentacionId(value)
+                    if (stockInicial === 0) setStockInicialUnidadId(value)
+                  }}
                   className={inputClass}
                 >
                   <option value="" disabled>
-                    Elegí la unidad base…
+                    Ej: caja, rollo, paquete…
                   </option>
                   {unidades.map((u) => (
                     <option key={u.id} value={u.id}>
@@ -568,13 +582,29 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                     </option>
                   ))}
                 </select>
+              </Field>
+              <Field label="Unidad del contenido" required icon={Ruler}>
+                <select value={unidadMedidaId ?? ''} onChange={(e) => setUnidadMedidaId(e.target.value)} className={inputClass}>
+                  <option value="" disabled>Ej: unidad, metro, litro…</option>
+                  {unidades.map((u) => <option key={u.id} value={u.id}>{u.nombre} ({u.abreviatura})</option>)}
+                </select>
+              </Field>
+              </div>
+              {unidadPresentacionId && unidadMedidaId && unidadPresentacionId !== unidadMedidaId && (
+                <Field label={`Cantidad contenida en cada ${unidades.find((u) => u.id === unidadPresentacionId)?.nombre ?? 'presentación'}`} required icon={Ruler}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground shrink-0">1 {unidades.find((u) => u.id === unidadPresentacionId)?.abreviatura} =</span>
+                    <input type="number" min="0" step="any" value={cantidadContenido} onChange={(e) => setCantidadContenido(Number(e.target.value))} className={inputClass} />
+                    <span className="text-sm text-muted-foreground shrink-0">{unidades.find((u) => u.id === unidadMedidaId)?.abreviatura}</span>
+                  </div>
                 <p
                   className="text-[10px] text-muted-foreground mt-1"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
-                  El stock se almacena siempre en esta unidad. Si cargás en otra unidad, va a convertir.
+                  Ejemplo: 1 caja = 30 unidades o 1 rollo = 100 metros.
                 </p>
               </Field>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label="Stock inicial" icon={BarChart3}>

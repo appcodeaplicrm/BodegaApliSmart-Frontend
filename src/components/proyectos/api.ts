@@ -354,6 +354,7 @@ export async function listarProductos(bodegaId: string): Promise<ProductoCatalog
       costoPromedio: p.costoPromedio,
       stockBodega: stockTotal,
       unidadMedida: p.unidadMedida,
+      conversiones: p.conversiones ?? [],
     }
   })
 }
@@ -366,4 +367,9 @@ export type ProductoCatalogoT = {
   costoPromedio?: number | string | null
   stockBodega?: number | string | null
   unidadMedida?: { id: string; abreviatura: string } | null
+  conversiones?: Array<{
+    factorConversion: number | string
+    unidadOrigen: { id: string; abreviatura: string }
+    unidadDestino: { id: string; abreviatura: string }
+  }>
 }

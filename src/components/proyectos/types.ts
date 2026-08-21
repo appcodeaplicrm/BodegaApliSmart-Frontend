@@ -200,6 +200,10 @@ export type SolicitudProducto = {
   productoId: string
   cantidadSolicitada: number
   cantidadEntregada: number
+  unidadSolicitadaId?: string | null
+  factorConversion?: number | null
+  cantidadSolicitadaBase?: number | null
+  cantidadEntregadaBase?: number | null
   costoUnitarioAlMomento: number
   subtotal: number
   producto: {
@@ -245,13 +249,13 @@ export type SolicitudDetalle = SolicitudListItem & {
 }
 
 export type CrearSolicitudInput = {
-  items: Array<{ productoId: string; cantidadSolicitada: number }>
+  items: Array<{ productoId: string; cantidadSolicitada: number; unidadMedidaId?: string }>
   comentario?: string
 }
 
 export type AprobarSolicitudInput = CrearSolicitudInput
 export type EntregarSolicitudInput = {
-  items: Array<{ productoId: string; cantidadEntregada: number }>
+  items: Array<{ productoId: string; cantidadEntregada: number; unidadMedidaId?: string }>
   comentario?: string
 }
 export type RechazarSolicitudInput = { motivo: string }

@@ -9,6 +9,7 @@ type ItemDraft = {
   uid: string
   productoId: string
   cantidad: number
+  unidadMedidaId: string
 }
 
 type Props = {
@@ -21,7 +22,7 @@ type Props = {
 }
 
 function newItem(): ItemDraft {
-  return { uid: `i-${Math.random().toString(36).slice(2, 8)}`, productoId: '', cantidad: 1 }
+  return { uid: `i-${Math.random().toString(36).slice(2, 8)}`, productoId: '', cantidad: 1, unidadMedidaId: '' }
 }
 
 /**
@@ -45,6 +46,7 @@ export function ModalCrearKit({ bodegaId, kitInicial, onClose, onCreated, onUpda
           uid: `i-${it.id}`,
           productoId: it.productoId,
           cantidad: it.cantidad,
+          unidadMedidaId: it.unidadMedidaId ?? it.producto.unidadMedida?.id ?? '',
         }))
       : [newItem()],
   )
@@ -105,6 +107,7 @@ export function ModalCrearKit({ bodegaId, kitInicial, onClose, onCreated, onUpda
           items: filled.map((it) => ({
             productoId: it.productoId,
             cantidad: it.cantidad,
+            unidadMedidaId: it.unidadMedidaId || undefined,
           })),
         })
         onUpdated?.(k)
@@ -116,6 +119,7 @@ export function ModalCrearKit({ bodegaId, kitInicial, onClose, onCreated, onUpda
           items: filled.map((it) => ({
             productoId: it.productoId,
             cantidad: it.cantidad,
+            unidadMedidaId: it.unidadMedidaId || undefined,
           })),
         })
         onCreated?.(k)
@@ -249,7 +253,13 @@ export function ModalCrearKit({ bodegaId, kitInicial, onClose, onCreated, onUpda
                 </span>
                 <select
                   value={it.productoId}
-                  onChange={(e) => setItem(it.uid, { productoId: e.target.value })}
+                  onChange={(e) => {
+                    const producto = productos.find((p) => p.id === e.target.value)
+                    setItem(it.uid, {
+                      productoId: e.target.value,
+                      unidadMedidaId: producto?.unidadMedida.id ?? '',
+                    })
+                  }}
                   className="flex-1 min-w-0 px-2 py-1.5 min-h-[44px] bg-background border border-border text-sm text-foreground outline-none focus:border-primary/60"
                   style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
                 >
@@ -262,6 +272,29 @@ export function ModalCrearKit({ bodegaId, kitInicial, onClose, onCreated, onUpda
                     </option>
                   ))}
                 </select>
+                {it.productoId && (() => {
+                  const producto = productos.find((p) => p.id === it.productoId)
+                  if (!producto) return null
+                  const opciones = [
+                    { id: producto.unidadMedida.id, label: producto.unidadMedida.abreviatura },
+                    ...producto.conversiones
+                      .filter((c) => c.unidadDestino.id === producto.unidadMedida.id)
+                      .map((c) => ({
+                        id: c.unidadOrigen.id,
+                        label: `${c.unidadOrigen.abreviatura} (1 = ${Number(c.factorConversion)} ${producto.unidadMedida.abreviatura})`,
+                      })),
+                  ]
+                  return (
+                    <select
+                      value={it.unidadMedidaId || producto.unidadMedida.id}
+                      onChange={(e) => setItem(it.uid, { unidadMedidaId: e.target.value })}
+                      className="w-36 min-h-[44px] px-2 bg-background border border-border text-xs text-foreground"
+                      title="Presentación dentro del kit"
+                    >
+                      {opciones.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                    </select>
+                  )
+                })()}
                 <input
                   type="number"
                   min={0.001}

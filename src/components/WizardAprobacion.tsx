@@ -16,6 +16,7 @@ import type { PedidoListItem, EntregaItem } from '../store/pedidos'
 import { api, ApiError } from '../lib/api'
 import { uploadsService } from '../store/productos'
 import { Modal } from './Modal'
+import { useCapturaEvidencia } from '../hooks/useCapturaEvidencia'
 
 type Props = {
   pedido: PedidoListItem
@@ -51,6 +52,7 @@ type Props = {
  * de estado (AprobadoPorBodega → Entregado, pasando por el técnico).
  */
 export function WizardAprobacion({ pedido, rol, items, onClose, onResolved }: Props) {
+  const evidencia = useCapturaEvidencia()
   const [stepIdx, setStepIdx] = useState(0)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
@@ -421,7 +423,6 @@ export function WizardAprobacion({ pedido, rol, items, onClose, onResolved }: Pr
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleFile}
             className="hidden"
           />
@@ -434,16 +435,16 @@ export function WizardAprobacion({ pedido, rol, items, onClose, onResolved }: Pr
                   className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
                   style={{ borderRadius: '0.25rem' }}
                 >
-                  <CameraIcon size={14} /> Abrir cámara
+                  <CameraIcon size={14} /> Tomar foto
                 </button>
-                <button
+                {evidencia.puedeSubir && <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
                   className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-border text-sm hover:border-foreground/30"
                   style={{ borderRadius: '0.25rem' }}
                 >
                   <Camera size={14} /> Subir foto
-                </button>
+                </button>}
               </>
             )}
             {cameraOn && (

@@ -377,6 +377,18 @@ const isLanding = location.pathname === '/'
           }
         />
         <Route
+          path="/inventario/productos-entregados"
+          element={
+            <RequireAuth loadingFallback={<FullScreenLoader />} fallback={<Navigate to="/login" replace />}>
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <Dashboard view="productos-entregados" onExit={handleExit} />
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/alertas"
           element={
             <RequireAuth

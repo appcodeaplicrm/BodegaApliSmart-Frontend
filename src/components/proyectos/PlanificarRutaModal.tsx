@@ -72,7 +72,7 @@ type PuntoMarcado = {
   rol: 'inicio' | 'waypoint' | 'fin'
 }
 
-const DEFAULT_CENTER = { lat: 4.711, lng: -74.0721 }
+const DEFAULT_CENTER = { lat: -0.1807, lng: -78.4678 }
 const DEFAULT_ZOOM = 12
 
 export function PlanificarRutaModal({

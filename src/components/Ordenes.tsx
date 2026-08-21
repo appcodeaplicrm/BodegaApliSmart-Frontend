@@ -9,6 +9,7 @@ import {
   Send,
   Lock,
   ChevronRight,
+  FileCheck2,
 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useBodegaActiva } from '../store/bodegaActiva'
@@ -27,6 +28,7 @@ import { WizardAprobacion, itemsParaWizard } from './WizardAprobacion'
 import { Pagination } from './Pagination'
 import { PageHeader } from './PageHeader'
 import { Modal } from './Modal'
+import { ReporteUsoModal } from './ReporteUsoModal'
 
 type TabKey = 'TODAS' | EstadoPedido
 
@@ -69,12 +71,23 @@ export function Ordenes() {
   const [wizardTecnico, setWizardTecnico] = useState<PedidoListItem | null>(null)
   const [pedidoCompletoTecnico, setPedidoCompletoTecnico] = useState<Pedido | null>(null)
   const [cargandoTecnico, setCargandoTecnico] = useState(false)
+  const [reportePedido, setReportePedido] = useState<Pedido | null>(null)
+  const [cargandoReporte, setCargandoReporte] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   const usuarioId = auth.status === 'autenticado' ? auth.sesion.usuario.id : null
   const usuarioNombre = auth.status === 'autenticado' ? auth.sesion.usuario.nombre : '—'
   const usuarioRol = auth.status === 'autenticado' ? auth.sesion.usuario.rol : '—'
+
+  const abrirReporte = useCallback(async (pedido: PedidoListItem) => {
+    setCargandoReporte(true)
+    try {
+      setReportePedido(await pedidosStore.findOne(pedido.id))
+    } finally {
+      setCargandoReporte(false)
+    }
+  }, [])
 
   const cargar = useCallback(() => {
     if (!bodegaId || !usuarioId) return
@@ -400,6 +413,7 @@ export function Ordenes() {
                                 onRevisarTecnico={() => abrirWizardTecnico(o)}
                                 onCancelar={() => setAccionCancel(o)}
                                 onVer={() => setDetalle(o)}
+                                onReporte={() => void abrirReporte(o)}
                               />
                             </div>
                           </Td>
@@ -469,6 +483,18 @@ export function Ordenes() {
           </div>
         </Modal>
       )}
+      {cargandoReporte && (
+        <Modal open onClose={() => {}} title="Cargando reporte" size="sm" dismissOnOverlay={false}>
+          <div className="p-6 flex items-center gap-3"><Loader2 size={20} className="text-primary animate-spin" /><span>Cargando solicitud…</span></div>
+        </Modal>
+      )}
+      {reportePedido && (
+        <ReporteUsoModal
+          pedido={reportePedido}
+          onClose={() => setReportePedido(null)}
+          onCreated={() => void pedidosStore.recargarSilencioso()}
+        />
+      )}
     </div>
   )
 }
@@ -528,11 +554,13 @@ function AccionOperador({
   onRevisarTecnico,
   onCancelar,
   onVer,
+  onReporte,
 }: {
   pedido: PedidoListItem
   onRevisarTecnico: () => void
   onCancelar: () => void
   onVer: () => void
+  onReporte: () => void
 }) {
   const estado = pedido.estadoNombre
 
@@ -561,6 +589,18 @@ function AccionOperador({
     )
   }
   if (estado === 'Entregado' || estado === 'Cancelado') {
+    if (estado === 'Entregado') {
+      return (
+        <button
+          onClick={onReporte}
+          className="inline-flex items-center gap-1 px-3 py-1.5 border border-primary/50 text-xs text-primary hover:bg-primary/5 transition-colors"
+          style={{ borderRadius: '0.25rem' }}
+        >
+          <FileCheck2 size={13} />
+          {pedido.reporteUso ? 'Ver reporte' : 'Subir reporte'}
+        </button>
+      )
+    }
     return (
       <button
         onClick={onVer}

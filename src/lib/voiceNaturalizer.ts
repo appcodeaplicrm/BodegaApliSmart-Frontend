@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 1_200
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
   dateStyle: 'long',
   timeStyle: 'short',
-  timeZone: 'America/Bogota',
+  timeZone: 'America/Guayaquil',
 })
 
 const cleanText = (value: string) => value

@@ -19,6 +19,7 @@ type ItemDraft = {
   productoId: string
   kitId: string
   cantidad: number
+  unidadMedidaId: string
 }
 
 type CrearOrdenModalProps = {
@@ -34,6 +35,7 @@ function newItem(): ItemDraft {
     productoId: '',
     kitId: '',
     cantidad: 1,
+    unidadMedidaId: '',
   }
 }
 
@@ -191,7 +193,11 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
           if (it.kind === 'kit') {
             return { kitId: it.kitId, cantidad: it.cantidad }
           }
-          return { productoId: it.productoId, cantidad: it.cantidad }
+          return {
+            productoId: it.productoId,
+            cantidad: it.cantidad,
+            unidadMedidaId: it.unidadMedidaId || undefined,
+          }
         }),
       })
       onCreated?.()
@@ -321,7 +327,7 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        setItem(it.uid, { kind: 'producto', kitId: '' })
+                        setItem(it.uid, { kind: 'producto', kitId: '', unidadMedidaId: '' })
                       }
                       className={`flex-1 sm:flex-initial px-2 py-1.5 min-h-[44px] text-[11px] inline-flex items-center justify-center gap-1 transition-colors ${
                         it.kind === 'producto'
@@ -335,7 +341,7 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        setItem(it.uid, { kind: 'kit', productoId: '' })
+                        setItem(it.uid, { kind: 'kit', productoId: '', unidadMedidaId: '' })
                       }
                       className={`flex-1 sm:flex-initial px-2 py-1.5 min-h-[44px] text-[11px] inline-flex items-center justify-center gap-1 transition-colors ${
                         it.kind === 'kit'
@@ -350,7 +356,8 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
 
                   <input
                     type="number"
-                    min={1}
+                    min={0.001}
+                    step={0.001}
                     value={it.cantidad}
                     onChange={(e) => setItem(it.uid, { cantidad: Number(e.target.value) })}
                     className="col-start-3 row-start-1 min-h-[44px] w-20 border border-border bg-background px-2 py-1.5 text-center text-sm text-foreground outline-none focus:border-primary/60 sm:col-start-4"
@@ -371,7 +378,13 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                   {it.kind === 'producto' ? (
                     <SelectMobile
                       value={it.productoId}
-                      onChange={(v) => setItem(it.uid, { productoId: v })}
+                      onChange={(v) => {
+                        const producto = productos.find((p) => p.id === v)
+                        setItem(it.uid, {
+                          productoId: v,
+                          unidadMedidaId: producto?.unidadMedida.id ?? '',
+                        })
+                      }}
                       options={productos.map((p) => ({ value: p.id, label: p.nombre }))}
                       placeholder={
                         productosLoading ? 'Cargando productos…' : 'Seleccionar producto…'
@@ -395,6 +408,30 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
                     />
                   )}
                 </div>
+                {it.kind === 'producto' && it.productoId && (() => {
+                  const producto = productos.find((p) => p.id === it.productoId)
+                  if (!producto) return null
+                  const opciones = [
+                    { id: producto.unidadMedida.id, label: producto.unidadMedida.abreviatura },
+                    ...producto.conversiones
+                      .filter((c) => c.unidadDestino.id === producto.unidadMedida.id)
+                      .map((c) => ({
+                        id: c.unidadOrigen.id,
+                        label: `${c.unidadOrigen.abreviatura} (1 = ${Number(c.factorConversion)} ${producto.unidadMedida.abreviatura})`,
+                      })),
+                  ]
+                  return (
+                    <div className="mt-2 ml-7">
+                      <SelectMobile
+                        value={it.unidadMedidaId || producto.unidadMedida.id}
+                        onChange={(v) => setItem(it.uid, { unidadMedidaId: v })}
+                        options={opciones.map((o) => ({ value: o.id, label: o.label }))}
+                        label="Presentación solicitada"
+                        className="w-full"
+                      />
+                    </div>
+                  )
+                })()}
                 </div>
 
                 {/* Si es kit, mostramos el desglose de productos que tiene */}

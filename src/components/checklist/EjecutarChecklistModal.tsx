@@ -21,6 +21,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../Modal'
+import { useCapturaEvidencia } from '../../hooks/useCapturaEvidencia'
 import {
   Check,
   XCircle,
@@ -420,6 +421,7 @@ function ItemRow({
   onSetFoto: (key: string) => void
   onClearFoto: () => void
 }) {
+  const evidencia = useCapturaEvidencia()
   const [showCamera, setShowCamera] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -507,7 +509,7 @@ function ItemRow({
           {/* Botones de foto y preview (solo para ESCALERAS, no EPP) */}
           {!disabled && !isEpp && ok !== 'noPresenta' && (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <button
+              {evidencia.puedeSubir && <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 className="inline-flex items-center gap-1 px-2 py-1 text-[10px] border border-border hover:border-primary/40 disabled:opacity-50"
@@ -515,7 +517,7 @@ function ItemRow({
                 title="Elegir una imagen del dispositivo"
               >
                 <Upload size={11} /> Subir foto
-              </button>
+              </button>}
               <button
                 onClick={() => setShowCamera(true)}
                 disabled={uploading}

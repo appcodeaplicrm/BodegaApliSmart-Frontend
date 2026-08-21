@@ -7,6 +7,9 @@ export type KitItem = {
   id: string
   productoId: string
   cantidad: number
+  unidadMedidaId?: string | null
+  factorConversion?: number | null
+  cantidadBase?: number | null
   producto: {
     id: string
     codigo: string
@@ -56,13 +59,13 @@ export type CreateKitInput = {
   bodegaId: string
   nombre: string
   descripcion?: string
-  items: Array<{ productoId: string; cantidad: number }>
+  items: Array<{ productoId: string; cantidad: number; unidadMedidaId?: string }>
 }
 
 export type UpdateKitInput = {
   nombre?: string
   descripcion?: string
-  items?: Array<{ productoId: string; cantidad: number }>
+  items?: Array<{ productoId: string; cantidad: number; unidadMedidaId?: string }>
   activo?: boolean
 }
 

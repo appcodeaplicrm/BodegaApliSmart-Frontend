@@ -29,6 +29,7 @@ type Item = {
   cantidadSolicitada: number
   nombre: string
   unidad: string
+  unidadMedidaId: string
 }
 
 export function SolicitudBodegaModal({
@@ -73,7 +74,7 @@ export function SolicitudBodegaModal({
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { productoId: '', cantidadSolicitada: 0, nombre: '', unidad: '' },
+      { productoId: '', cantidadSolicitada: 0, nombre: '', unidad: '', unidadMedidaId: '' },
     ])
   }
   function updateItem(idx: number, patch: Partial<Item>) {
@@ -93,6 +94,7 @@ export function SolicitudBodegaModal({
         .map((it) => ({
           productoId: it.productoId,
           cantidadSolicitada: it.cantidadSolicitada,
+          unidadMedidaId: it.unidadMedidaId || undefined,
         }))
       await crearSolicitud(proyectoId, {
         items: itemsValidos,
@@ -195,6 +197,7 @@ export function SolicitudBodegaModal({
                           productoId: e.target.value,
                           nombre: p?.nombre ?? '',
                           unidad: p?.unidadMedida?.abreviatura ?? '',
+                          unidadMedidaId: p?.unidadMedida?.id ?? '',
                         })
                       }}
                       className="w-full px-2 py-1.5 bg-background border border-border text-xs"
@@ -236,6 +239,31 @@ export function SolicitudBodegaModal({
                       <Trash2 size={14} />
                     </button>
                   </div>
+                  {it.productoId && (() => {
+                    const producto = productos.find((p) => p.id === it.productoId)
+                    if (!producto?.unidadMedida) return null
+                    const opciones = [
+                      { id: producto.unidadMedida.id, label: producto.unidadMedida.abreviatura },
+                      ...(producto.conversiones ?? [])
+                        .filter((c) => c.unidadDestino.id === producto.unidadMedida!.id)
+                        .map((c) => ({
+                          id: c.unidadOrigen.id,
+                          label: `${c.unidadOrigen.abreviatura} (1 = ${Number(c.factorConversion)} ${producto.unidadMedida!.abreviatura})`,
+                        })),
+                    ]
+                    return (
+                      <select
+                        value={it.unidadMedidaId || producto.unidadMedida.id}
+                        onChange={(e) => updateItem(idx, {
+                          unidadMedidaId: e.target.value,
+                          unidad: opciones.find((o) => o.id === e.target.value)?.label ?? '',
+                        })}
+                        className="col-span-12 px-2 py-1.5 bg-background border border-border text-xs"
+                      >
+                        {opciones.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                      </select>
+                    )
+                  })()}
                 </div>
               ))}
             </div>

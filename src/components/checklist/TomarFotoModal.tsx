@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Camera, X, RefreshCw, Upload, AlertCircle } from 'lucide-react'
 import { Modal } from './Modal'
+import { useCapturaEvidencia } from '../../hooks/useCapturaEvidencia'
 
 type Props = {
   /** Se muestra en el header del modal. */
@@ -24,6 +25,7 @@ type Props = {
 }
 
 export function TomarFotoModal({ label, onClose, onCapture }: Props) {
+  const evidencia = useCapturaEvidencia()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -42,7 +44,11 @@ export function TomarFotoModal({ label, onClose, onCapture }: Props) {
           return
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         })
         if (cancel) {
@@ -61,7 +67,7 @@ export function TomarFotoModal({ label, onClose, onCapture }: Props) {
         if (msg.includes('Permission') || msg.includes('NotAllowed')) {
           setError('Necesitamos permiso para usar la cámara. Habilítalo e intenta de nuevo.')
         } else if (msg.includes('NotFound') || msg.includes('DevicesNotFound')) {
-          setError('No se encontró ninguna cámara. Usa "Subir foto" como alternativa.')
+          setError('No se encontró ninguna cámara disponible para tomar la foto.')
         } else {
           setError(`No se pudo abrir la cámara: ${msg}`)
         }
@@ -139,13 +145,13 @@ export function TomarFotoModal({ label, onClose, onCapture }: Props) {
             <div className="flex flex-col items-center justify-center gap-3 py-6">
               <AlertCircle size={28} className="text-primary" />
               <p className="text-sm text-muted-foreground text-center max-w-sm">{error}</p>
-              <button
+              {evidencia.puedeSubir && <button
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-border hover:border-primary/40"
                 style={{ borderRadius: '0.25rem' }}
               >
                 <Upload size={12} /> Subir foto
-              </button>
+              </button>}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -207,14 +213,14 @@ export function TomarFotoModal({ label, onClose, onCapture }: Props) {
               </>
             ) : (
               <>
-                <button
+                {evidencia.puedeSubir && <button
                   onClick={() => fileInputRef.current?.click()}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-border hover:border-primary/40"
                   style={{ borderRadius: '0.25rem' }}
                   title="Elegir una imagen ya guardada"
                 >
                   <Upload size={12} /> Subir foto
-                </button>
+                </button>}
                 <button
                   onClick={handleCapture}
                   disabled={!ready}

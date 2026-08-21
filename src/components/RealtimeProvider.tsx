@@ -163,6 +163,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   useRealtimeEvent('entrega-item.cambiado', (e) => {
     pedidosStore.handleEntregaItemCambiado(e as any)
   })
+  useRealtimeEvent('pedido.reporte-uso-creado', (e) => {
+    pedidosStore.handleEstadoCambiado({
+      id: String((e.payload as any)?.pedidoId ?? ''),
+      codigo: String((e.payload as any)?.codigo ?? ''),
+      estadoAnterior: 'Entregado',
+      estadoNuevo: 'Entregado',
+      bodegaId: e.bodegaId ?? null,
+    })
+  })
   useRealtimeEvent('devolucion.creada', (e) => {
     const currentBodegaId = bodegaActivaStore.getSnapshot().bodegaId ?? undefined
     devolucionesStore.handleDevolucionCreada({

@@ -5,6 +5,7 @@ import {
   ImageIcon,
 } from 'lucide-react'
 import { Modal } from './Modal'
+import { useCapturaEvidencia } from '../hooks/useCapturaEvidencia'
 
 export type Salida = {
   id: string
@@ -38,6 +39,7 @@ const tecnicos = [
 ]
 
 export function SalidaModal({ onClose, onSubmit }: SalidaModalProps) {
+  const evidencia = useCapturaEvidencia()
   const [producto, setProducto] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [tecnico, setTecnico] = useState('')
@@ -45,6 +47,7 @@ export function SalidaModal({ onClose, onSubmit }: SalidaModalProps) {
   const [foto, setFoto] = useState<string | null>(null)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const uploadRef = useRef<HTMLInputElement>(null)
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -162,39 +165,36 @@ export function SalidaModal({ onClose, onSubmit }: SalidaModalProps) {
             ref={fileRef}
             type="file"
             accept="image/*"
+            capture={evidencia.capture}
             onChange={handleFile}
             className="hidden"
           />
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="w-full min-h-[44px] h-24 border border-dashed border-border bg-muted hover:border-primary/40 transition-colors flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground overflow-hidden"
-            style={{ borderRadius: '0.25rem' }}
-          >
-            {foto ? (
+          {evidencia.puedeSubir && <input
+            ref={uploadRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFile}
+            className="hidden"
+          />}
+          {foto ? (
+            <div className="w-full h-24 border border-border bg-muted overflow-hidden" style={{ borderRadius: '0.25rem' }}>
               <img
                 src={foto}
                 alt="preview"
                 className="w-full h-full object-cover"
               />
-            ) : (
-              <>
-                <ImageIcon size={18} />
-                <span
-                  className="text-xs"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  Subir foto
-                </span>
-              </>
-            )}
-          </button>
+            </div>
+          ) : <div className="flex gap-2">
+            <button type="button" onClick={() => fileRef.current?.click()} className="flex-1 min-h-[44px] border border-border bg-muted text-xs inline-flex items-center justify-center gap-2"><Camera size={14} />Tomar foto</button>
+            {evidencia.puedeSubir && <button type="button" onClick={() => uploadRef.current?.click()} className="flex-1 min-h-[44px] border border-border bg-muted text-xs inline-flex items-center justify-center gap-2"><ImageIcon size={14} />Subir foto</button>}
+          </div>}
           {foto && (
             <button
               type="button"
               onClick={() => {
                 setFoto(null)
                 if (fileRef.current) fileRef.current.value = ''
+                if (uploadRef.current) uploadRef.current.value = ''
               }}
               className="mt-1.5 text-[10px] text-muted-foreground hover:text-foreground underline"
               style={{ fontFamily: "'JetBrains Mono', monospace" }}

@@ -33,6 +33,7 @@ import { Modal } from './Modal'
 import { Modal as LegacyModal } from './checklist/Modal'
 import { SelectMobile } from './SelectMobile'
 import { imageUrl } from '../lib/apiBase'
+import { useCapturaEvidencia } from '../hooks/useCapturaEvidencia'
 import { comprasStore, type CompraDetalle } from '../store/compras'
 import { Eye, FileText, Image as ImageIcon } from 'lucide-react'
 
@@ -881,6 +882,7 @@ function CompraForm({
   onClose: () => void
   onCreated: () => void
 }) {
+  const evidencia = useCapturaEvidencia()
   // Header de la compra
   const [proveedorId, setProveedorId] = useState('')
   const [proveedores, setProveedores] = useState<
@@ -904,6 +906,7 @@ function CompraForm({
 
   // Ref al input file de fotos de factura
   const facturaFileInputRef = useRef<HTMLInputElement | null>(null)
+  const facturaUploadInputRef = useRef<HTMLInputElement | null>(null)
 
   // Cargar proveedores
   useEffect(() => {
@@ -1151,8 +1154,19 @@ function CompraForm({
     }
   }
 
+  const cantidadBaseItem = (it: CompraItemForm) => {
+    const producto = productos.find((p) => p.id === it.productoId)
+    if (!producto || !it.unidadMedidaId || it.unidadMedidaId === producto.unidadMedida.id) {
+      return it.cantidad
+    }
+    const conversion = producto.conversiones.find(
+      (c) => c.unidadOrigen.id === it.unidadMedidaId &&
+        c.unidadDestino.id === producto.unidadMedida.id,
+    )
+    return it.cantidad * Number(conversion?.factorConversion ?? 0)
+  }
   const totalEstimado = items.reduce(
-    (acc, it) => acc + (it.precioUnitario ?? 0) * it.cantidad,
+    (acc, it) => acc + (it.precioUnitario ?? 0) * cantidadBaseItem(it),
     0,
   )
   const formularioCompleto = Boolean(proveedorId) &&
@@ -1405,10 +1419,16 @@ function CompraForm({
                               style={{ borderRadius: '0.25rem' }}
                               disabled={!prod}
                             >
-                              {unidades.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.abreviatura}
-                                </option>
+                              {prod && [
+                                { id: prod.unidadMedida.id, label: prod.unidadMedida.abreviatura },
+                                ...prod.conversiones
+                                  .filter((c) => c.unidadDestino.id === prod.unidadMedida.id)
+                                  .map((c) => ({
+                                    id: c.unidadOrigen.id,
+                                    label: `${c.unidadOrigen.abreviatura} (1 = ${Number(c.factorConversion)} ${prod.unidadMedida.abreviatura})`,
+                                  })),
+                              ].map((u) => (
+                                <option key={u.id} value={u.id}>{u.label}</option>
                               ))}
                             </select>
                           </div>
@@ -1423,9 +1443,9 @@ function CompraForm({
                         </div>
                         {prod && (
                           <div className="flex justify-end text-[10px] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                            {it.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 3 })} × <ValorBlur value={Number(it.precioUnitario ?? 0)} render={(v) => v} />
+                            {cantidadBaseItem(it).toLocaleString('es-CO', { maximumFractionDigits: 3 })} {prod.unidadMedida.abreviatura} × <ValorBlur value={Number(it.precioUnitario ?? 0)} render={(v) => v} />
                             <span className="ml-2 font-semibold text-foreground">
-                              = <ValorBlur value={(it.precioUnitario ?? 0) * it.cantidad} render={(v) => v} />
+                              = <ValorBlur value={(it.precioUnitario ?? 0) * cantidadBaseItem(it)} render={(v) => v} />
                             </span>
                           </div>
                         )}
@@ -1487,6 +1507,7 @@ function CompraForm({
                 </span>
               )}
             </div>
+            <div className="flex gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => facturaFileInputRef.current?.click()}
@@ -1494,17 +1515,20 @@ function CompraForm({
               style={{ borderRadius: '0.25rem' }}
             >
               <Camera size={14} />
-              {facturaFiles.length === 0 ? 'Tomar foto' : 'Tomar otra'}
+              Tomar foto
             </button>
+            {evidencia.puedeSubir && <button type="button" onClick={() => facturaUploadInputRef.current?.click()} className="inline-flex min-h-[44px] flex-1 sm:flex-none items-center justify-center gap-1.5 border border-border bg-muted px-3 py-2 text-sm text-foreground hover:border-primary/40"><Camera size={14} />Subir foto</button>}
+            </div>
             <input
               ref={facturaFileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
+              capture={evidencia.capture}
               multiple
               className="hidden"
               onChange={(e) => onFacturaFilesChange(e.target.files)}
             />
+            {evidencia.puedeSubir && <input ref={facturaUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onFacturaFilesChange(e.target.files)} />}
           </div>
           {facturaPreview.length > 0 && (
             <ul className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -1587,7 +1611,9 @@ function FotoItemRow({
   item: CompraItemForm
   onChange: (itemId: string, file: File | null) => void
 }) {
+  const evidencia = useCapturaEvidencia()
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
   return (
     <div className="flex items-center gap-2">
       {item.fotoPreview ? (
@@ -1611,6 +1637,7 @@ function FotoItemRow({
           </button>
         </div>
       ) : (
+        <div className="flex gap-2">
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -1621,12 +1648,14 @@ function FotoItemRow({
           <Camera size={12} />
           Tomar foto
         </button>
+        {evidencia.puedeSubir && <button type="button" onClick={() => uploadInputRef.current?.click()} className="inline-flex items-center gap-1.5 min-h-[44px] px-2.5 py-1.5 border border-dashed border-border text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground" disabled={!item.productoId}><Camera size={12} />Subir foto</button>}
+        </div>
       )}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
+        capture={evidencia.capture}
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0] ?? null
@@ -1634,6 +1663,7 @@ function FotoItemRow({
           e.target.value = ''
         }}
       />
+      {evidencia.puedeSubir && <input ref={uploadInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0] ?? null; onChange(item.id, f); e.target.value = '' }} />}
       <span
         className="text-[10px] text-muted-foreground"
         style={{ fontFamily: "'JetBrains Mono', monospace" }}

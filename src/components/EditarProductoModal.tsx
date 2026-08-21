@@ -34,7 +34,10 @@ type Props = {
 }
 
 export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
-  const stockInicial = producto.stocks.reduce((acc, s) => acc + Number(s.cantidad), 0)
+  const presentacionActual = producto.conversiones.find((c) => c.unidadDestino.id === producto.unidadMedida.id)
+  const factorPresentacionActual = Number(presentacionActual?.factorConversion ?? 1)
+  const stockInicialBase = producto.stocks.reduce((acc, s) => acc + Number(s.cantidad), 0)
+  const stockInicial = stockInicialBase / factorPresentacionActual
   const bodegaId = producto.stocks[0]?.bodegaId ?? producto.bodega?.id ?? null
 
   const [codigo, setCodigo] = useState(producto.codigo)
@@ -43,10 +46,12 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
   const [categoriaId, setCategoriaId] = useState(producto.categoria.id)
   const [marcaId, setMarcaId] = useState(producto.marca?.id ?? '')
   const [precio, setPrecio] = useState(Number(producto.precio))
-  const [stockMinimo, setStockMinimo] = useState(Number(producto.stockMinimo))
-  const [stockMaximo, setStockMaximo] = useState(Number(producto.stockMaximo ?? 0))
+  const [stockMinimo, setStockMinimo] = useState(Number(producto.stockMinimo) / factorPresentacionActual)
+  const [stockMaximo, setStockMaximo] = useState(Number(producto.stockMaximo ?? 0) / factorPresentacionActual)
   const [stockCantidad, setStockCantidad] = useState(stockInicial)
   const [unidadMedidaId, setUnidadMedidaId] = useState(producto.unidadMedida.id)
+  const [unidadPresentacionId, setUnidadPresentacionId] = useState(presentacionActual?.unidadOrigen.id ?? producto.unidadMedida.id)
+  const [cantidadContenido, setCantidadContenido] = useState(Number(presentacionActual?.factorConversion ?? 1))
   const [activo, setActivo] = useState(producto.activo)
   // Política de devolución (sección 21 del .md). Editar este flag
   // afecta SOLO las próximas entregas (cada EntregaItem tiene su
@@ -90,23 +95,34 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
       setError('Completá código, nombre, categoría y unidad.')
       return
     }
+    if (unidadPresentacionId !== unidadMedidaId && cantidadContenido <= 0) {
+      setError('Indicá cuánto contiene cada presentación del producto.')
+      return
+    }
     setSubmitting(true)
     try {
       const input: UpdateProductoInput = {
+        ...(() => {
+          const factor = unidadPresentacionId !== unidadMedidaId ? cantidadContenido : 1
+          return {
+            stockMinimo: stockMinimo * factor,
+            stockMaximo: stockMaximo > 0 ? stockMaximo * factor : undefined,
+            stockCantidad: stockCantidad !== stockInicial ? stockCantidad * factor : undefined,
+          }
+        })(),
         codigo: codigo.trim(),
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || undefined,
         categoriaNombre: categorias.find((c) => c.id === categoriaId)?.nombre ?? '',
         marcaId: marcaId || undefined,
         unidadMedidaId,
+        unidadPresentacionId,
+        cantidadContenido: unidadPresentacionId !== unidadMedidaId ? cantidadContenido : undefined,
         bodegaId: bodegaId ?? undefined,
         precio,
-        stockMinimo,
-        stockMaximo: stockMaximo > 0 ? stockMaximo : undefined,
         activo,
         // Política de devolución (sección 21).
         admiteDevolucion,
-        stockCantidad: stockCantidad !== stockInicial ? stockCantidad : undefined,
         stockUbicacionId: ubicacionId ?? undefined,
       }
       const actualizado = await productosStore.actualizar(producto.id, input)
@@ -307,10 +323,11 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
 
           <Section title="Unidad y stock" icon={Ruler}>
             <div className="space-y-3">
-              <Field label="Unidad base" required icon={Ruler}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Field label="Presentación en inventario" required icon={Ruler}>
                 <select
-                  value={unidadMedidaId}
-                  onChange={(e) => setUnidadMedidaId(e.target.value)}
+                  value={unidadPresentacionId}
+                  onChange={(e) => setUnidadPresentacionId(e.target.value)}
                   className={inputClass}
                 >
                   {unidades.map((u) => (
@@ -320,6 +337,21 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
                   ))}
                 </select>
               </Field>
+              <Field label="Unidad del contenido" required icon={Ruler}>
+                <select value={unidadMedidaId} onChange={(e) => setUnidadMedidaId(e.target.value)} className={inputClass}>
+                  {unidades.map((u) => <option key={u.id} value={u.id}>{u.nombre} ({u.abreviatura})</option>)}
+                </select>
+              </Field>
+              </div>
+              {unidadPresentacionId !== unidadMedidaId && (
+                <Field label={`Contenido por ${unidades.find((u) => u.id === unidadPresentacionId)?.nombre ?? 'presentación'}`} required icon={Ruler}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground shrink-0">1 {unidades.find((u) => u.id === unidadPresentacionId)?.abreviatura} =</span>
+                    <input type="number" min="0" step="any" value={cantidadContenido} onChange={(e) => setCantidadContenido(Number(e.target.value))} className={inputClass} />
+                    <span className="text-sm text-muted-foreground shrink-0">{unidades.find((u) => u.id === unidadMedidaId)?.abreviatura}</span>
+                  </div>
+                </Field>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label="Stock actual" icon={BarChart3}>
                   <input
