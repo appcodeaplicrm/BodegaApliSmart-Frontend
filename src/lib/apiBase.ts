@@ -12,7 +12,8 @@
  * El `/api` final del prefijo se strippea porque las rutas de uploads
  * (p.ej. `/uploads/2026-07/abc.jpg`) están montadas sin el prefijo.
  */
-const ENV_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '').replace(/\/api$/, '')
+const RAW_ENV_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
+const ENV_BASE = RAW_ENV_BASE.replace(/\/api$/, '')
 
 function fallbackBase(): string {
   if (typeof window === 'undefined') return ''
@@ -53,20 +54,48 @@ export function apiBaseUrl(): string {
  */
 export function imageUrl(urlOrKey: string | null | undefined): string | null {
   if (!urlOrKey) return null
-  if (/^https?:\/\//i.test(urlOrKey)) return urlOrKey
   // data: URLs y blobs no se tocan
   if (urlOrKey.startsWith('data:') || urlOrKey.startsWith('blob:')) return urlOrKey
-  // En producción los assets nuevos pueden pasar por el proxy `/api`,
-  // que reescribe `/api/uploads/*` a `/uploads/*` en el backend.
+
+  const isLocalBrowser =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+
+  // En aaPanel/Nginx los archivos del backend se publican a través
+  // de `/api/uploads/*`. Normalizamos también URLs absolutas legacy
+  // del mismo dominio que todavía apuntan a `/uploads/*`.
+  if (/^https?:\/\//i.test(urlOrKey)) {
+    try {
+      const parsed = new URL(urlOrKey)
+      if (
+        !isLocalBrowser &&
+        typeof window !== 'undefined' &&
+        parsed.origin === window.location.origin &&
+        parsed.pathname.startsWith('/uploads/')
+      ) {
+        parsed.pathname = `/api${parsed.pathname}`
+        return parsed.toString()
+      }
+    } catch {
+      // Si no se puede interpretar, dejamos que el navegador trate la URL.
+    }
+    return urlOrKey
+  }
+
   if (urlOrKey.startsWith('/api/uploads/')) return urlOrKey
-  const base = apiBaseUrl()
-  if (!base) return null
-  // Si la key ya viene con `/uploads/`, la respetamos.
-  // Si no, se la agregamos.
-  const path = urlOrKey.startsWith('/uploads/')
-    ? urlOrKey
-    : urlOrKey.startsWith('/')
-      ? `/uploads${urlOrKey}`
-      : `/uploads/${urlOrKey}`
-  return `${base}${path}`
+
+  const key = urlOrKey
+    .replace(/^\/api\/uploads\//, '')
+    .replace(/^\/uploads\//, '')
+    .replace(/^\/+/, '')
+
+  // Si VITE_API_URL termina en /api, esa es también la ruta pública
+  // correcta para uploads. Sin variable: localhost accede directo al
+  // backend y producción usa el proxy /api del mismo origen.
+  if (RAW_ENV_BASE) {
+    const assetBase = RAW_ENV_BASE.endsWith('/api') ? RAW_ENV_BASE : ENV_BASE
+    return `${assetBase}/uploads/${key}`
+  }
+  if (isLocalBrowser) return `${apiBaseUrl()}/uploads/${key}`
+  return `/api/uploads/${key}`
 }

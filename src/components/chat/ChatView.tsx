@@ -47,6 +47,32 @@ function formatUltimo(ts: string | null): string {
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }
 
+function ChatAvatar({ fotoUrl, nombre }: { fotoUrl: string | null; nombre: string }) {
+  const [fallo, setFallo] = useState(false)
+  const inicial = nombre?.[0]?.toUpperCase() ?? '?'
+
+  useEffect(() => {
+    setFallo(false)
+  }, [fotoUrl])
+
+  if (!fotoUrl || fallo) {
+    return (
+      <div className="w-10 h-10 rounded-full bg-secondary/30 inline-flex items-center justify-center text-sm font-semibold text-foreground/80">
+        {inicial}
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={fotoUrl}
+      alt={nombre}
+      className="w-10 h-10 rounded-full object-cover bg-secondary/30"
+      onError={() => setFallo(true)}
+    />
+  )
+}
+
 export function ChatView() {
   const auth = useAuth()
   const bodegaId = useBodegaActiva()
@@ -107,12 +133,10 @@ export function ChatView() {
   useChatWsEvent('realtime:chat.mensaje-eliminado', () => {
     scheduleRefetch()
   })
-  useChatWsEvent('realtime:chat.leido-actualizado', () => {
-    scheduleRefetch()
-  })
-  useChatWsEvent('realtime:chat.reaccion-cambiada', () => {
-    scheduleRefetch()
-  })
+  // Las lecturas y reacciones se aplican dentro del panel activo.
+  // No cambian el orden ni el contenido resumido del sidebar, por lo
+  // que refetchearlo aquí provoca tráfico innecesario y puede crear un
+  // ciclo lectura -> socket -> GET -> lectura.
 
   // ─── Filtro de búsqueda ───
   const convsFiltradas = useMemo(() => {
@@ -226,7 +250,6 @@ export function ChatView() {
             ) : (
               <ul className="divide-y divide-border">
                 {convsFiltradas.map((c) => {
-                  const inicial = c.otroUsuario.nombre?.[0]?.toUpperCase() ?? '?'
                   const fotoUrl = imageUrl(c.otroUsuario.fotoKey)
                   const isActive = c.id === activeId
                   return (
@@ -241,17 +264,7 @@ export function ChatView() {
                       >
                         {/* Avatar */}
                         <div className="relative shrink-0">
-                          {fotoUrl ? (
-                            <img
-                              src={fotoUrl}
-                              alt={c.otroUsuario.nombre}
-                              className="w-10 h-10 rounded-full object-cover bg-secondary/30"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-secondary/30 inline-flex items-center justify-center text-sm font-semibold text-foreground/80">
-                              {inicial}
-                            </div>
-                          )}
+                          <ChatAvatar fotoUrl={fotoUrl} nombre={c.otroUsuario.nombre} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
