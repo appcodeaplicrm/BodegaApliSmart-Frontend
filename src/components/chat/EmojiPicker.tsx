@@ -38,9 +38,11 @@ type Props = {
   children?: React.ReactNode
   /** Tamaño del popover. */
   size?: 'sm' | 'md'
+  /** Lado desde el que se ancla para permanecer dentro del chat. */
+  align?: 'left' | 'right'
 }
 
-export function EmojiPicker({ onEmoji, children, size = 'md' }: Props) {
+export function EmojiPicker({ onEmoji, children, size = 'md', align = 'left' }: Props) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
 
@@ -90,7 +92,7 @@ export function EmojiPicker({ onEmoji, children, size = 'md' }: Props) {
       )}
       {open && (
         <div
-          className="absolute z-50 bottom-full mb-2 right-0 bg-card border border-border shadow-lg p-2 w-[300px] sm:w-[360px]"
+          className={`absolute z-50 bottom-full mb-2 ${align === 'right' ? 'right-0' : 'left-0'} bg-card border border-border shadow-lg p-2 w-[min(360px,calc(100vw-2rem))]`}
           style={{ borderRadius: '0.375rem' }}
           role="dialog"
           aria-label="Emojis"

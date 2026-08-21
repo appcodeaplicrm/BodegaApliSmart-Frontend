@@ -156,7 +156,11 @@ export function MensajeBurbuja({
                   ].join(' ')}
                 >
                   {m.adjuntos.map((a) => {
-                    const url = imageUrl(a.url)
+                    // La key identifica el archivo de forma estable. El campo
+                    // url puede contener rutas legacy (/uploads) o incluso el
+                    // host donde se subió originalmente, por lo que no debe
+                    // usarse como fuente principal en otro entorno.
+                    const url = imageUrl(a.key || a.url)
                     if (!url) return null
                     return (
                       <button
@@ -255,6 +259,7 @@ export function MensajeBurbuja({
           >
             <EmojiPicker
               size="sm"
+              align={esMio ? 'right' : 'left'}
               onEmoji={(e) => onReact?.(m, e)}
             >
               <span
