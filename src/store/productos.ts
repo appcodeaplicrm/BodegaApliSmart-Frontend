@@ -369,7 +369,7 @@ export function useProductos() {
  * Secciones del StorageService. El front las usa para indicar
  * al back DÓNDE guardar el archivo (multi-tenant).
  */
-export type UploadSeccion = 'products' | 'dispatches' | 'returns' | 'documents'
+export type UploadSeccion = 'products' | 'dispatches' | 'returns' | 'documents' | 'proyectos'
 
 export type UploadOptions = {
   seccion: UploadSeccion

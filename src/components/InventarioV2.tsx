@@ -33,6 +33,7 @@ import { useProductos, productosStore, type Producto, type ProductoListItem } fr
 import { useKits, kitsStore, type Kit } from '../store/kits'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
+import { ValorBlur } from '../lib/valorBlur'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -657,7 +658,7 @@ function ProductoFila({
             className="text-[10px] text-muted-foreground"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
-            {formatPesos(p.precio)}
+            <ValorBlur value={p.precio} />
           </div>
         </div>
 
@@ -748,7 +749,7 @@ function ProductoFila({
         </span>
         {/* Precio */}
         <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {formatPesos(p.precio)}
+          <ValorBlur value={p.precio} />
         </span>
         {/* Estado */}
         <span className="flex items-center gap-1.5">

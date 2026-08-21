@@ -58,6 +58,13 @@ type ModalProps = {
   dismissOnOverlay?: boolean
   /** Si true, previene el scroll del body mientras el modal está abierto. Default true. */
   lockScroll?: boolean
+  /**
+   * Si es false, el body del modal NO scrollea (queda fijo con
+   * `overflow-hidden`). Útil para modals que contienen un mapa
+   * u otro contenido que necesita controlar su propio scroll.
+   * Default true.
+   */
+  scrollBody?: boolean
   /** className extra para el contenedor interno del modal. */
   contentClassName?: string
   /** Ref opcional al elemento que debe recibir foco al abrir. */
@@ -86,6 +93,7 @@ export function Modal({
   size = 'md',
   dismissOnOverlay = true,
   lockScroll = true,
+  scrollBody = true,
   contentClassName = '',
   initialFocusRef,
 }: ModalProps) {
@@ -253,8 +261,16 @@ export function Modal({
           </div>
 
           {/* Body scrolleable: flex-1 min-h-0 es la combinación mágica
-              que permite scrollear dentro de un flex-col con max-h. */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              que permite scrollear dentro de un flex-col con max-h.
+              Si `scrollBody={false}`, queda fijo (sin scroll) y los
+              hijos pueden controlar su propio scroll. Útil para
+              modals con mapas. */}
+          <div
+            className={[
+              'flex-1 min-h-0 overscroll-contain',
+              scrollBody ? 'overflow-y-auto' : 'overflow-hidden',
+            ].join(' ')}
+          >
             {children}
           </div>
 

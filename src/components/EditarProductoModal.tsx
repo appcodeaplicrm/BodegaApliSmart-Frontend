@@ -25,6 +25,7 @@ import { useMarcas, marcasStore } from '../store/marcas'
 import { useUbicaciones } from '../store/ubicaciones'
 import { ModalCrearCatalogo } from './ModalCrearCatalogo'
 import { Modal } from './Modal'
+import { ValorInputBlur } from '../lib/valorBlur'
 
 type Props = {
   producto: Producto
@@ -367,13 +368,9 @@ export function EditarProductoModal({ producto, onClose, onSaved }: Props) {
                   />
                 </Field>
                 <Field label="Precio (COP)" icon={DollarSign}>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    inputMode="decimal"
+                  <ValorInputBlur
                     value={precio}
-                    onChange={(e) => setPrecio(Number(e.target.value))}
+                    onChange={(v) => setPrecio(v === '' ? 0 : v)}
                     className={inputClass}
                   />
                 </Field>

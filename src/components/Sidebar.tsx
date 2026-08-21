@@ -47,6 +47,7 @@ import {
   Tag,
   Award,
   MapPin,
+  MessageCircle,
 } from 'lucide-react'
 
 type BadgeStyle = 'count' | 'alert' | 'new' | 'alertas'
@@ -101,6 +102,9 @@ type SidebarProps = {
 }
 
 const general: NavItem[] = [
+  // Chat interno 1-a-1 — sin permiso (visible para todos los
+  // usuarios activos de la bodega).
+  { key: 'chat', path: '/chat', label: 'Chat', icon: MessageCircle },
   { key: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permiso: 'dashboard.ver' },
   {
     key: 'inventario',
@@ -414,31 +418,32 @@ export function Sidebar({ active, subKey, onLogout, mobileOpen = false, onMobile
     if (esPropietario) return true
     return permisosUsuario.has(`${moduloKey}.${subKey}.ver`)
   }
-  function padreTieneVer(moduloKey: string): boolean {
-    if (esPropietario) return true
-    return permisosUsuario.has(`${moduloKey}.ver`)
-  }
+  // ⚠️ Antes había un `padreTieneVer` que se usaba para mostrar el
+  // módulo padre si algún sub-módulo era visible. Lo eliminamos
+  // porque contradice la regla de "ocultar el módulo si no tenés el
+  // permiso del padre" (los sub-permisos se usan para flujos
+  // puntuales como Solicitud de Recursos, no para mostrar el módulo
+  // en el sidebar).
 
   function tienePermisoEnModulo(item: NavItem): boolean {
     if (tienePermiso(item.permiso)) return true
     if (esPropietario) return true
     if (item.children) {
-      // Módulo con sub-módulos: aparece si tiene `ver` propio O si
-      // al menos un hijo es visible.
-      if (padreTieneVer(item.key)) return true
-      return item.children.some((c) => {
-        const modulo = MODULOS.find((m) => m.key === item.key)
-        if (modulo?.submodulos) {
-          // Buscamos el sub-módulo en el catálogo por la key del
-          // SubItemDef (que coincide con la key del sub-módulo).
-          return puedeVerSubmodulo(item.key, c.key)
-        }
-        // Si NO tiene sub-módulos en MODULOS pero el item declara
-        // children (raro, pero por las dudas), usamos el permiso
-        // del primer hijo o del padre.
-        if (tienePermiso(c.permiso)) return true
-        return false
-      })
+      // Módulo con sub-módulos: aparece SOLO si tiene el `ver` propio
+      // del módulo padre. NO se filtra por sub-módulos visibles.
+      //
+      // Razón (ago 2026): un user con permisos granulares del
+      // sub-módulo (ej: `inventario.productos.ver` sin
+      // `inventario.ver`) debe poder usar la lista de productos
+      // desde otros flujos (Solicitud de Recursos, Despachos)
+      // SIN ver el módulo Inventario en el sidebar. El check se
+      // hace en el BACK (los endpoints aceptan cualquiera de los
+      // dos permisos, ver `productos.controller.ts`).
+      //
+      // Antes (mal) mostraba el módulo si algún sub-módulo era
+      // visible, contradiciendo la intención de "ocultar el módulo
+      // si no tenés el permiso del padre".
+      return false
     }
     // Módulo plano.
     return puedeVerModuloPlano(item.key)

@@ -197,14 +197,28 @@ export function SuperAdminPlanes() {
   const [editData, setEditData] = useState<Plan | null>(null)
   const [showCreatePlan, setShowCreatePlan] = useState(false)
   const [permissionCatalog, setPermissionCatalog] = useState<PermissionApi[]>([])
+  const [featureCatalog, setFeatureCatalog] = useState<FeatureApi[]>([])
   const totalMRR = planes.reduce((sum, p) => sum + (p.active ? p.price * p.empresas : 0), 0)
 
   useEffect(() => {
     api.get<BackendPlan[]>('/admin/plans').then(data => setPlanes(data.map(backendPlanToUi))).catch(() => {})
     api.get<PermissionApi[]>('/admin/plan-permissions').then(setPermissionCatalog).catch(() => {})
+    api.get<FeatureApi[]>('/admin/features').then(setFeatureCatalog).catch(() => {})
   }, [])
 
-  const startEdit = (plan: Plan) => { setEditing(plan.name); setEditData({ ...plan, features: [...plan.features], featureItems: plan.featureItems.map(item => ({ ...item })), permissionKeys: [...plan.permissionKeys] }) }
+  const startEdit = (plan: Plan) => {
+    const existing = new Map(plan.featureItems.map((item) => [item.code, item]))
+    const featureItems = featureCatalog.length
+      ? featureCatalog.map((feature) => {
+          const current = existing.get(feature.code)
+          return current
+            ? { ...current }
+            : { code: feature.code, name: feature.name, type: feature.type, enabled: false, limitValue: null }
+        })
+      : plan.featureItems.map((item) => ({ ...item }))
+    setEditing(plan.name)
+    setEditData({ ...plan, features: [...plan.features], featureItems, permissionKeys: [...plan.permissionKeys] })
+  }
   const save = async () => {
     if (!editing || !editData) return
     await api.patch(`/admin/plans/${editData.id}`, { priceAmount: Math.round(editData.price * 100), description: editData.desc })
@@ -236,7 +250,18 @@ export function SuperAdminPlanes() {
             </div>
             <div><div className="eyebrow mb-2">CAPACIDADES Y LÍMITES</div><div className="border border-border divide-y divide-border grid grid-cols-1 2xl:grid-cols-2 2xl:divide-y-0">
               {editData.featureItems.map((feature, i) => <div key={feature.code} className="p-3 flex items-center gap-3 border-b 2xl:odd:border-r border-border last:border-b-0">
-                <input type="checkbox" checked={feature.enabled} onChange={e => setEditData({ ...editData, featureItems: editData.featureItems.map((f, n) => n === i ? { ...f, enabled: e.target.checked } : f) })} className="accent-[#ABF768]"/>
+                <input type="checkbox" checked={feature.enabled} onChange={e => {
+                  const checked = e.target.checked
+                  setEditData({
+                    ...editData,
+                    featureItems: editData.featureItems.map((f, n) => {
+                      if (n === i) return { ...f, enabled: checked }
+                      if (checked && feature.code === 'ai.integrated' && f.code === 'ai.byok') return { ...f, enabled: false }
+                      if (checked && feature.code === 'ai.byok' && f.code === 'ai.integrated') return { ...f, enabled: false }
+                      return f
+                    }),
+                  })
+                }} className="accent-[#ABF768]"/>
                 <div className="flex-1 min-w-0"><div className={`text-xs ${feature.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>{feature.name}</div><div className="text-[9px] font-mono text-muted-foreground">{feature.code}</div></div>
                 {feature.type !== 'boolean' && feature.enabled && <input type="number" min={0} value={feature.limitValue ?? ''} placeholder="Ilimitado" onChange={e => setEditData({ ...editData, featureItems: editData.featureItems.map((f, n) => n === i ? { ...f, limitValue: e.target.value === '' ? null : Number(e.target.value) } : f) })} className="control py-1.5 w-28"/>}
               </div>)}

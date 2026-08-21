@@ -24,6 +24,7 @@ import {
   CalendarDays,
   Shield,
   Inbox,
+  Bot,
 } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
 import { authStore, useAuth } from '../store/auth'
@@ -86,7 +87,23 @@ type SesionItem = {
   current: boolean
 }
 
-type Tab = 'info' | 'seguridad' | 'notificaciones' | 'actividad'
+type Tab = 'info' | 'seguridad' | 'notificaciones' | 'actividad' | 'ia'
+
+type AiConfig = {
+  mode: 'integrated' | 'byok' | 'none'
+  configurable: boolean
+  provider?: string
+  groqModel?: string
+  groqApiKeyConfigured?: boolean
+  auditEnabled?: boolean
+  deepgramVoice?: string
+  deepgramTtsEnabled?: boolean
+  deepgramApiKeyConfigured?: boolean
+  deepgramAgentId?: string
+  projectId?: string
+  throttleTtl?: number
+  throttleLimit?: number
+}
 
 // Catálogo de notificaciones (debe matchear el back)
 const NOTIF_GRUPOS: Array<{ grupo: string; items: Array<{ key: NotifKey; label: string; desc: string }> }> = [
@@ -125,12 +142,18 @@ export function Perfil() {
   const [searchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
   const [tab, setTab] = useState<Tab>(
-    requestedTab === 'notificaciones' ? 'notificaciones' : 'info',
+    requestedTab === 'notificaciones' ? 'notificaciones' : requestedTab === 'ia' ? 'ia' : 'info',
   )
+  const [aiConfig, setAiConfig] = useState<AiConfig | null>(null)
 
   useEffect(() => {
     if (requestedTab === 'notificaciones') setTab('notificaciones')
+    if (requestedTab === 'ia') setTab('ia')
   }, [requestedTab])
+
+  useEffect(() => {
+    api.get<AiConfig>('/perfil/ai-config').then(setAiConfig).catch(() => setAiConfig(null))
+  }, [])
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-background">
@@ -139,12 +162,13 @@ export function Perfil() {
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-4xl mx-auto space-y-6">
           <ProfileCard />
-          <Tabs tab={tab} setTab={setTab} />
+          <Tabs tab={tab} setTab={setTab} showAi={aiConfig?.configurable === true} />
 
           {tab === 'info' && <TabInfo />}
           {tab === 'seguridad' && <TabSeguridad />}
           {tab === 'notificaciones' && <TabNotificaciones />}
           {tab === 'actividad' && <TabActividad />}
+          {tab === 'ia' && aiConfig?.configurable && <TabAi config={aiConfig} onSaved={setAiConfig} />}
 
           {/* firma de auth para que no marque unused */}
           {auth.status === 'autenticado' ? null : null}
@@ -404,7 +428,7 @@ function CardSkeleton() {
 //  Tabs
 // ───────────────────────────────────────────────────────────────────
 
-function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+function Tabs({ tab, setTab, showAi }: { tab: Tab; setTab: (t: Tab) => void; showAi: boolean }) {
   return (
     <div className="grid w-full grid-cols-2 gap-1 rounded-lg border border-border bg-muted p-1 sm:inline-flex sm:w-fit sm:items-center">
       <TabButton active={tab === 'info'} onClick={() => setTab('info')}>
@@ -423,6 +447,12 @@ function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
         <History size={13} />
         Actividad
       </TabButton>
+      {showAi && (
+        <TabButton active={tab === 'ia'} onClick={() => setTab('ia')}>
+          <Bot size={13} />
+          Mi IA
+        </TabButton>
+      )}
     </div>
   )
 }
@@ -1163,6 +1193,120 @@ function TabNotificaciones() {
 // ───────────────────────────────────────────────────────────────────
 //  TAB: Actividad
 // ───────────────────────────────────────────────────────────────────
+
+function TabAi({ config, onSaved }: { config: AiConfig; onSaved: (value: AiConfig) => void }) {
+  const [form, setForm] = useState({
+    provider: config.provider ?? 'groq',
+    groqApiKey: '',
+    groqModel: config.groqModel ?? 'openai/gpt-oss-20b',
+    auditEnabled: config.auditEnabled ?? true,
+    deepgramApiKey: '',
+    deepgramVoice: config.deepgramVoice ?? 'aura-2-javier-es',
+    deepgramTtsEnabled: config.deepgramTtsEnabled ?? true,
+    deepgramAgentId: config.deepgramAgentId ?? '',
+    projectId: config.projectId ?? '',
+    throttleTtl: config.throttleTtl ?? 60,
+    throttleLimit: config.throttleLimit ?? 5,
+  })
+  const [saving, setSaving] = useState(false)
+  const [provisioning, setProvisioning] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const update = (key: keyof typeof form, value: string | number | boolean) =>
+    setForm((current) => ({ ...current, [key]: value }))
+
+  const save = async () => {
+    setSaving(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const payload = {
+        ...form,
+        groqApiKey: form.groqApiKey.trim() || undefined,
+        deepgramApiKey: form.deepgramApiKey.trim() || undefined,
+      }
+      const saved = await api.patch<AiConfig>('/perfil/ai-config', payload)
+      onSaved(saved)
+      setForm((current) => ({ ...current, groqApiKey: '', deepgramApiKey: '' }))
+      setMessage('Configuración guardada. Las credenciales quedaron cifradas.')
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo guardar la configuración.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const provisionAgent = async () => {
+    setProvisioning(true)
+    setError(null)
+    setMessage(null)
+    try {
+      if (form.deepgramApiKey.trim()) {
+        await api.patch<AiConfig>('/perfil/ai-config', {
+          deepgramApiKey: form.deepgramApiKey.trim(),
+          deepgramVoice: form.deepgramVoice,
+          projectId: form.projectId,
+        })
+      } else if (form.projectId !== (config.projectId ?? '') || form.deepgramVoice !== (config.deepgramVoice ?? 'aura-2-javier-es')) {
+        await api.patch<AiConfig>('/perfil/ai-config', {
+          deepgramVoice: form.deepgramVoice,
+          projectId: form.projectId,
+        })
+      }
+      const result = await api.post<AiConfig>('/perfil/ai-config/provision-agent', {})
+      onSaved(result)
+      setForm((current) => ({ ...current, deepgramApiKey: '', deepgramAgentId: result.deepgramAgentId ?? '' }))
+      setMessage('Agente de Deepgram creado y vinculado automáticamente.')
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo crear el agente de Deepgram.')
+    } finally {
+      setProvisioning(false)
+    }
+  }
+
+  const inputClass = 'control w-full'
+  return (
+    <section className="bg-card border border-border">
+      <div className="p-5 border-b border-border">
+        <div className="eyebrow text-secondary">CONFIGURACIÓN DEL TENANT</div>
+        <h2 className="font-heading text-2xl uppercase mt-1">Tu propia inteligencia artificial</h2>
+        <p className="text-sm text-muted-foreground mt-1">Solo el propietario puede administrar estas credenciales. Las claves existentes nunca se muestran.</p>
+      </div>
+      <div className="p-5 grid gap-5 md:grid-cols-2">
+        <AiField label="Proveedor"><select className={inputClass} value={form.provider} onChange={(e) => update('provider', e.target.value)}><option value="groq">Groq</option></select></AiField>
+        <AiField label="Modelo Groq"><input className={inputClass} value={form.groqModel} onChange={(e) => update('groqModel', e.target.value)} /></AiField>
+        <AiField label="Groq API Key"><input type="password" autoComplete="new-password" className={inputClass} value={form.groqApiKey} onChange={(e) => update('groqApiKey', e.target.value)} placeholder={config.groqApiKeyConfigured ? 'Configurada · escribe para reemplazarla' : 'gsk_...'} /></AiField>
+        <AiField label="Voz Deepgram"><input className={inputClass} value={form.deepgramVoice} onChange={(e) => update('deepgramVoice', e.target.value)} /></AiField>
+        <AiField label="Deepgram API Key"><input type="password" autoComplete="new-password" className={inputClass} value={form.deepgramApiKey} onChange={(e) => update('deepgramApiKey', e.target.value)} placeholder={config.deepgramApiKeyConfigured ? 'Configurada · escribe para reemplazarla' : 'Clave de Deepgram'} /></AiField>
+        <AiField label="Deepgram Agent ID"><input className={`${inputClass} opacity-70`} readOnly value={form.deepgramAgentId} placeholder="Se generará automáticamente" /></AiField>
+        <AiField label="Deepgram Project ID"><input className={inputClass} value={form.projectId} onChange={(e) => update('projectId', e.target.value)} /></AiField>
+        <div className="grid grid-cols-2 gap-3">
+          <AiField label="Ventana (segundos)"><input type="number" min={10} max={3600} className={inputClass} value={form.throttleTtl} onChange={(e) => update('throttleTtl', Number(e.target.value))} /></AiField>
+          <AiField label="Solicitudes máximas"><input type="number" min={1} max={100} className={inputClass} value={form.throttleLimit} onChange={(e) => update('throttleLimit', Number(e.target.value))} /></AiField>
+        </div>
+        <div className="md:col-span-2 flex flex-wrap gap-5 border border-border p-4">
+          <ToggleSetting label="Auditorías con IA" checked={form.auditEnabled} onChange={(value) => update('auditEnabled', value)} />
+          <ToggleSetting label="Síntesis de voz Deepgram" checked={form.deepgramTtsEnabled} onChange={(value) => update('deepgramTtsEnabled', value)} />
+        </div>
+      </div>
+      <div className="p-5 border-t border-border flex items-center justify-between gap-4 flex-wrap">
+        <div className={`text-xs ${error ? 'text-primary' : 'text-secondary'}`}>{error ?? message}</div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={saving || provisioning} onClick={provisionAgent} className="btn-outline inline-flex items-center gap-2 disabled:opacity-50"><Bot size={14} />{provisioning ? 'Creando agente…' : form.deepgramAgentId ? 'Recrear agente' : 'Crear agente automáticamente'}</button>
+          <button type="button" disabled={saving || provisioning} onClick={save} className="btn-primary inline-flex items-center gap-2 disabled:opacity-50"><Save size={14} />{saving ? 'Guardando…' : 'Guardar configuración'}</button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function AiField({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="space-y-2"><span className="eyebrow">{label}</span>{children}</label>
+}
+
+function ToggleSetting({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return <button type="button" onClick={() => onChange(!checked)} className="inline-flex items-center gap-2 text-sm">{checked ? <ToggleRight className="text-secondary" /> : <ToggleLeft className="text-muted-foreground" />}{label}</button>
+}
 
 function TabActividad() {
   const [items, setItems] = useState<ActividadItem[]>([])

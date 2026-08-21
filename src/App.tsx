@@ -12,6 +12,7 @@ import { Perfil } from './components/Perfil'
 import { SinPermisosBodega } from './components/SinPermisosBodega'
 import { SuperAdminEmpresas, SuperAdminPlanes, SuperAdminPlaceholder } from './components/SuperAdmin'
 import { AppLayout } from './components/AppLayout'
+import { ChatView } from './components/chat/ChatView'
 import { RequireAuth } from './components/RequireAuth'
 import { RealtimeProvider } from './components/RealtimeProvider'
 import { ToastBridge } from './components/ToastBridge'
@@ -512,6 +513,21 @@ const isLanding = location.pathname === '/'
           }
         />
         <Route
+          path="/tecnicos/proyectos/:id"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <Dashboard view="tecnicos" onExit={handleExit} />
+              )}
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/tecnicos/:subKey"
           element={
             <RequireAuth
@@ -625,6 +641,26 @@ const isLanding = location.pathname === '/'
               <AppLayout onExit={handleExit}>
                 <SinPermisosBodega onLogout={handleExit} />
               </AppLayout>
+            </RequireAuth>
+          }
+        />
+
+        {/* Chat interno 1-a-1 — sin permisos, todos los usuarios
+            activos de la bodega pueden usarlo. */}
+        <Route
+          path="/chat"
+          element={
+            <RequireAuth
+              loadingFallback={<FullScreenLoader />}
+              fallback={<Navigate to="/login" replace />}
+            >
+              {auth.status === 'autenticado' && !auth.sesion.usuario.bodegaId ? (
+                <Navigate to={rutaSegunSesion(auth.sesion.usuario.rol, null)} replace />
+              ) : (
+                <AppLayout onExit={handleExit}>
+                  <ChatView />
+                </AppLayout>
+              )}
             </RequireAuth>
           }
         />

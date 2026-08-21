@@ -1,21 +1,10 @@
 import { ArrowRight, ChevronRight } from 'lucide-react'
 
-// Tamaño y posición libre del operador.
-// - `height`: cambia el tamaño de la imagen.
-// - `left`: mueve horizontalmente.
-// - `bottom`: mueve verticalmente.
-const HERO_WORKER_STYLE = {
-  height: '120%',
-  left: '43%',
-  bottom: '-37px',
-  transform: 'translateX(-50%)',
-}
-
 export function Hero() {
   return (
     <section className="pt-20 pb-16 sm:pb-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="grid md:grid-cols-[0.9fr_1.1fr] gap-8 md:gap-10 items-center">
+        <div className="relative grid md:grid-cols-[0.9fr_1.1fr] gap-8 md:gap-10 items-center">
           <div>
             <h1
               className="text-6xl sm:text-7xl md:text-8xl lg:text-8xl uppercase leading-[0.95] text-foreground break-words"
@@ -60,11 +49,9 @@ export function Hero() {
             </div>
           </div>
           <div
-            className="pointer-events-none absolute inset-[10%] z-0 rounded-full blur-1xl"
-            style={{
-              background:
-                'radial-gradient(circle at 85% 90%, rgba(255, 92, 0) 0%, rgba(255, 30, 0,0.1) 45%, rgba(116,78,34,0.10) 54%, rgba(36,36,36,0) 74%)',
-            }}
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-[2%] z-0 hidden rounded-full blur-1xl md:block
+              [background:radial-gradient(circle_at_85%_90%,rgba(255,92,0)_0%,rgba(255,30,0,0.1)_45%,rgba(116,78,34,0.10)_54%,rgba(36,36,36,0)_74%)]"
           />
           <HeroImage />
         </div>
@@ -94,12 +81,19 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 function HeroImage() {
   return (
-    <div className="relative w-full overflow-visible aspect-[4/3]">
+    <div className="relative isolate w-full overflow-visible aspect-[16/10] md:aspect-[4/3]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute z-0 top-[-7%] bottom-[-17%] -left-[35%] -right-[5%] rounded-r-[999px] blur-1xl md:hidden
+          [background:radial-gradient(ellipse_at_82%_72%,rgba(255,92,0,1)_0%,rgba(255,30,0,0.34)_30%,rgba(116,78,34,0.20)_55%,rgba(36,36,36,0)_78%)]
+          "
+      />
       <img
         src="/hero-warehouse-worker.png"
         alt="Operador de bodega transportando una caja"
-        className="absolute z-10 block w-auto max-w-none object-contain object-bottom"
-        style={HERO_WORKER_STYLE}
+        className="absolute z-10 block w-auto max-w-none object-contain object-bottom
+          h-[138%] left-[50%] -bottom-11 -translate-x-1/2
+          md:h-[120%] md:left-[43%] md:-bottom-[37px]"
         loading="eager"
         fetchPriority="high"
       />

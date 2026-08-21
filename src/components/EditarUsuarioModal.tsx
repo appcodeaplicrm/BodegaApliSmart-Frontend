@@ -15,9 +15,11 @@ import {
   MODULOS,
   ACCIONES,
   ACCION_LABELS,
+  labelAccion,
   keyVerPadre,
   TODAS_LAS_KEYS,
   apiGetPermisosUsuario,
+  accionesCustomSubmodulo,
   type ModuloKey,
   type ModuloDef,
   type SubmoduloDef,
@@ -204,7 +206,10 @@ export function EditarUsuarioModal({ usuario, onClose, onSaved }: EditarUsuarioM
   function toggleSubmoduloCompleto(m: ModuloKey, s: SubmoduloDef) {
     setPermisos((prev) => {
       const next = { ...prev }
-      const keys = ACCIONES.map((a) => `${m}.${s.key}.${a}` as Permiso)
+      // Incluimos las acciones custom del sub-módulo (si las tiene)
+      // para que el toggle "invertir" del sub-módulo las togglee también.
+      const accs = s.acciones ?? ACCIONES
+      const keys = accs.map((a) => `${m}.${s.key}.${a}` as Permiso)
       const allOn = keys.every((k) => next[k])
       for (const k of keys) next[k] = !allOn
       return next
@@ -531,7 +536,7 @@ export function EditarUsuarioModal({ usuario, onClose, onSaved }: EditarUsuarioM
                           key={a}
                           className="text-center px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal"
                         >
-                          {ACCION_LABELS[a]}
+                          {labelAccion(a)}
                         </th>
                       ))}
                       <th className="text-center px-3 py-2 text-[10px] text-muted-foreground tracking-widest uppercase font-normal w-16">
@@ -787,48 +792,91 @@ function renderGrupoModulo(
       </tr>
       {expanded &&
         m.submodulos.map((s) => {
+          const accsCustom = accionesCustomSubmodulo(s)
           return (
-            <tr
-              key={`${m.key}.${s.key}`}
-              className="border-b border-border last:border-b-0"
-            >
-              <td
-                className="px-3 py-2 text-sm text-muted-foreground pl-9"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
+            <>
+              <tr
+                key={`${m.key}.${s.key}`}
+                className="border-b border-border last:border-b-0"
               >
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-3 h-px bg-border" aria-hidden />
-                  {s.label}
-                </span>
-              </td>
-              {ACCIONES.map((a) => {
-                const p: Permiso = `${m.key}.${s.key}.${a}`
-                return (
-                  <td key={a} className="text-center px-2 py-2">
-                    <button
-                      type="button"
-                      onClick={() => togglePermiso(p)}
-                      className={`w-7 h-7 border flex items-center justify-center transition-colors ${cellClass(p)}`}
-                      style={{ borderRadius: '0.15rem' }}
-                      title={p}
-                    >
-                      {cellIcon(p)}
-                    </button>
-                  </td>
-                )
-              })}
-              <td className="text-center px-2 py-2">
-                <button
-                  type="button"
-                  onClick={() => toggleSubmoduloCompleto?.(m.key, s)}
-                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                  title="Invertir todas las acciones del sub-módulo"
+                <td
+                  className="px-3 py-2 text-sm text-muted-foreground pl-9"
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}
                 >
-                  invertir
-                </button>
-              </td>
-            </tr>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-3 h-px bg-border" aria-hidden />
+                    {s.label}
+                    {accsCustom.length > 0 && (
+                      <span
+                        className="text-[9px] text-muted-foreground/70 ml-1"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        (+{accsCustom.length} custom)
+                      </span>
+                    )}
+                  </span>
+                </td>
+                {ACCIONES.map((a) => {
+                  const p: Permiso = `${m.key}.${s.key}.${a}`
+                  return (
+                    <td key={a} className="text-center px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => togglePermiso(p)}
+                        className={`w-7 h-7 border flex items-center justify-center transition-colors ${cellClass(p)}`}
+                        style={{ borderRadius: '0.15rem' }}
+                        title={p}
+                      >
+                        {cellIcon(p)}
+                      </button>
+                    </td>
+                  )
+                })}
+                <td className="text-center px-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSubmoduloCompleto?.(m.key, s)}
+                    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    title="Invertir todas las acciones del sub-módulo"
+                  >
+                    invertir
+                  </button>
+                </td>
+              </tr>
+              {/* Acciones custom granulares del sub-módulo. Como no
+                  entran en las 4 columnas de la tabla, se renderizan
+                  como fila extra con chips. */}
+              {accsCustom.length > 0 && (
+                <tr
+                  key={`${m.key}.${s.key}.custom`}
+                  className="border-b border-border last:border-b-0 bg-muted/20"
+                >
+                  <td
+                    colSpan={ACCIONES.length + 2}
+                    className="px-3 py-2 pl-12"
+                  >
+                    <div className="flex flex-wrap gap-1.5">
+                      {accsCustom.map((a) => {
+                        const p: Permiso = `${m.key}.${s.key}.${a}`
+                        return (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => togglePermiso(p)}
+                            title={p}
+                            className={`min-h-[28px] px-2 py-0.5 text-[10px] border transition-colors ${cellClass(p)}`}
+                            style={{ borderRadius: '0.15rem' }}
+                          >
+                            {labelAccion(a)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </>
           )
         })}
     </>
@@ -1010,7 +1058,7 @@ function ModuloAccionesGridMovil({
               style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
             >
               {has && <Check size={12} />}
-              {ACCION_LABELS[a as keyof typeof ACCION_LABELS] ?? a}
+              {labelAccion(a)}
             </button>
           )
         })}
@@ -1040,6 +1088,8 @@ function ModuloAccionesGridMovil({
  * Grilla mobile de acciones para un sub-módulo concreto.
  * Muestra el label del sub-módulo arriba, la grilla de 4 acciones, y
  * el botón "Todo" para invertir todo el sub.
+ * Si el sub-módulo tiene acciones custom, las renderiza como
+ * chips extra abajo de la grilla principal.
  */
 function SubmoduloAccionesGridMovil({
   moduloKey,
@@ -1050,24 +1100,33 @@ function SubmoduloAccionesGridMovil({
   onToggleTodo,
 }: {
   moduloKey: string
-  sub: { key: string; label: string }
+  sub: SubmoduloDef
   permisos: PermisoEstado
   basePerms: Set<string>
   onToggle: (p: Permiso) => void
   onToggleTodo: () => void
 }) {
+  // Las 4 acciones base (ver/crear/editar/eliminar).
   const keys = ACCIONES.map((a) => `${moduloKey}.${sub.key}.${a}` as Permiso)
   const onCount = keys.filter((k) => permisos[k]).length
   const allOn = onCount === keys.length
   const someOn = onCount > 0
 
+  // Acciones custom granulares del sub-módulo (si las tiene).
+  const accsCustom = accionesCustomSubmodulo(sub)
+
   return (
     <div>
       <div
-        className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5"
+        className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-2"
         style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
-        {sub.label}
+        <span>{sub.label}</span>
+        {accsCustom.length > 0 && (
+          <span className="text-[9px] text-muted-foreground/70 normal-case">
+            (+{accsCustom.length} custom)
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-3 gap-2">
         {ACCIONES.map((a) => {
@@ -1088,11 +1147,39 @@ function SubmoduloAccionesGridMovil({
               style={{ borderRadius: '0.25rem', fontFamily: "'DM Sans', sans-serif" }}
             >
               {has && <Check size={12} />}
-              {ACCION_LABELS[a]}
+              {labelAccion(a)}
             </button>
           )
         })}
       </div>
+      {/* Acciones custom granulares (chips) */}
+      {accsCustom.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {accsCustom.map((a) => {
+            const p = `${moduloKey}.${sub.key}.${a}` as Permiso
+            const has = permisos[p]
+            const isBase = basePerms.has(p)
+            const cls = has
+              ? 'border-secondary/50 bg-secondary/15 text-secondary'
+              : !has && isBase
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground'
+            return (
+              <button
+                key={a}
+                type="button"
+                onClick={() => onToggle(p)}
+                title={p}
+                className={`min-h-[32px] px-2 py-1 text-[10px] border transition-colors ${cls} flex items-center justify-center gap-1`}
+                style={{ borderRadius: '0.15rem', fontFamily: "'DM Sans', sans-serif" }}
+              >
+                {has && <Check size={10} />}
+                {labelAccion(a)}
+              </button>
+            )
+          })}
+        </div>
+      )}
       <button
         type="button"
         onClick={onToggleTodo}

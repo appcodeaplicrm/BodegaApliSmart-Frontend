@@ -29,6 +29,7 @@ import { useAuth } from '../store/auth'
 import { ModalCrearCatalogo } from './ModalCrearCatalogo'
 import { Modal } from './Modal'
 import { useCatalogoRealtime } from '../hooks/useCatalogoRealtime'
+import { ValorInputBlur } from '../lib/valorBlur'
 
 type DocUpload = {
   id: string
@@ -636,13 +637,9 @@ export function NuevoProductoModal({ bodegaId, onClose, onCreated }: Props) {
                   />
                 </Field>
                 <Field label="Precio unitario (COP)" icon={DollarSign}>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    inputMode="decimal"
+                  <ValorInputBlur
                     value={precio}
-                    onChange={(e) => setPrecio(Number(e.target.value))}
+                    onChange={(v) => setPrecio(v === '' ? 0 : v)}
                     className={inputClass}
                   />
                 </Field>

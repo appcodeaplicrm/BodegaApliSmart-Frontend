@@ -104,7 +104,7 @@ export function DevolucionDetalleModal({ devolucion, onClose }: Props) {
     completo.items.some((it) => it.estado === 'pendiente')
 
   const puedeRecibirBodeguero =
-    completo?.estado === 'en_transito' && puedeRecibir &&
+    completo?.estado === 'en_transito' && puedeRecibir && !esDueno &&
     completo.items.some((it) => it.estado === 'en_transito')
 
   if (cargando) {

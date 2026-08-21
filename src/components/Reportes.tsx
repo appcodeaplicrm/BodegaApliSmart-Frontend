@@ -28,6 +28,7 @@ import { useAuth } from '../store/auth'
 import { PageHeader } from './PageHeader'
 import { bodegaActivaStore } from '../store/bodegaActiva'
 import { productosStore } from '../store/productos'
+import { ValorBlur } from '../lib/valorBlur'
 import {
   reportesApi,
   defaultRango,
@@ -264,7 +265,7 @@ function ResumenView() {
 }
 
 function KpisGrid({ kpis }: { kpis: ResumenResponse['kpis'] }) {
-  const cards: { label: string; value: string; icon: typeof TrendingUp; tone: 'good' | 'bad' | 'neutral' }[] = [
+  const cards: { label: string; value: React.ReactNode; icon: typeof TrendingUp; tone: 'good' | 'bad' | 'neutral' }[] = [
     {
       label: 'Total entradas',
       value: fmtNumero(kpis.totalEntradas, 0),
@@ -285,7 +286,7 @@ function KpisGrid({ kpis }: { kpis: ResumenResponse['kpis'] }) {
     },
     {
       label: 'Valor del stock',
-      value: fmtMoneda(kpis.valorStock),
+      value: <ValorBlur value={kpis.valorStock} render={() => fmtMoneda(kpis.valorStock)} />,
       icon: DollarSign,
       tone: 'neutral',
     },
@@ -417,7 +418,7 @@ function TopValorizadosCard({
                 className="text-secondary tabular-nums shrink-0"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                {fmtMoneda(p.valorizado)}
+                <ValorBlur value={p.valorizado} render={() => fmtMoneda(p.valorizado)} />
               </p>
             </div>
           ))}
@@ -533,12 +534,12 @@ function TotalesStrip({ data }: { data: ReporteResponse }) {
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <KpiSimple label="Items" value={fmtNumero(data.totalItems, 0)} />
       <KpiSimple label="Cantidad total" value={fmtNumero(data.totalCantidad, 0)} />
-      <KpiSimple label="Costo total" value={fmtMoneda(data.totalCosto)} />
+      <KpiSimple label="Costo total" value={<ValorBlur value={data.totalCosto} render={() => fmtMoneda(data.totalCosto)} />} />
     </div>
   )
 }
 
-function KpiSimple({ label, value }: { label: string; value: string }) {
+function KpiSimple({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div
       className="bg-card border border-border p-3"
@@ -623,13 +624,13 @@ function MovimientosTable({ items }: { items: ReporteItem[] }) {
                   className="py-2 px-3 text-right text-muted-foreground whitespace-nowrap hidden md:table-cell"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
-                  {it.costoUnitario != null ? fmtMoneda(it.costoUnitario) : '—'}
+                  {it.costoUnitario != null ? <ValorBlur value={it.costoUnitario} render={() => fmtMoneda(it.costoUnitario!)} /> : '—'}
                 </td>
                 <td
                   className="py-2 px-3 text-right text-secondary whitespace-nowrap hidden md:table-cell"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
-                  {it.costoTotal != null ? fmtMoneda(it.costoTotal) : '—'}
+                  {it.costoTotal != null ? <ValorBlur value={it.costoTotal} render={() => fmtMoneda(it.costoTotal!)} /> : '—'}
                 </td>
                 <td className="py-2 px-3 text-muted-foreground text-xs hidden lg:table-cell">
                   {it.usuario}
@@ -838,11 +839,11 @@ function ProductoKardexHeader({ data }: { data: KardexResponse }) {
       />
       <KpiSimple
         label="Costo prom. final"
-        value={fmtMoneda(data.costoPromedioFinal)}
+        value={<ValorBlur value={data.costoPromedioFinal} render={() => fmtMoneda(data.costoPromedioFinal)} />}
       />
       <KpiSimple
         label="Stock valorizado"
-        value={fmtMoneda(data.saldoFinalValorizado)}
+        value={<ValorBlur value={data.saldoFinalValorizado} render={() => fmtMoneda(data.saldoFinalValorizado)} />}
       />
     </div>
   )
@@ -904,13 +905,13 @@ function KardexTable({ data }: { data: KardexResponse }) {
                 className="py-2 px-3 text-right text-muted-foreground hidden md:table-cell"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                {fmtMoneda(data.costoPromedioInicial)}
+                <ValorBlur value={data.costoPromedioInicial} render={() => fmtMoneda(data.costoPromedioInicial)} />
               </td>
               <td
                 className="py-2 px-3 text-right text-muted-foreground hidden md:table-cell"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                {fmtMoneda(data.saldoInicialValorizado)}
+                <ValorBlur value={data.saldoInicialValorizado} render={() => fmtMoneda(data.saldoInicialValorizado)} />
               </td>
               <td colSpan={2} className="hidden lg:table-cell" />
             </tr>
@@ -944,7 +945,7 @@ function KardexTable({ data }: { data: KardexResponse }) {
                   className="py-2 px-3 text-right text-muted-foreground whitespace-nowrap hidden md:table-cell"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
-                  {l.costoUnitario != null ? fmtMoneda(l.costoUnitario) : '—'}
+                  {l.costoUnitario != null ? <ValorBlur value={l.costoUnitario} render={() => fmtMoneda(l.costoUnitario!)} /> : '—'}
                 </td>
                 <td
                   className="py-2 px-3 text-right text-foreground whitespace-nowrap tabular-nums"
@@ -956,7 +957,7 @@ function KardexTable({ data }: { data: KardexResponse }) {
                   className="py-2 px-3 text-right text-secondary whitespace-nowrap hidden md:table-cell"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
-                  {fmtMoneda(l.saldoValorizado)}
+                  <ValorBlur value={l.saldoValorizado} render={() => fmtMoneda(l.saldoValorizado)} />
                 </td>
                 <td className="py-2 px-3 text-muted-foreground text-xs hidden lg:table-cell">
                   {l.usuario}
@@ -992,13 +993,13 @@ function KardexTable({ data }: { data: KardexResponse }) {
                 className="py-2 px-3 text-right text-foreground font-semibold hidden md:table-cell"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                {fmtMoneda(data.costoPromedioFinal)}
+                <ValorBlur value={data.costoPromedioFinal} render={() => fmtMoneda(data.costoPromedioFinal)} />
               </td>
               <td
                 className="py-2 px-3 text-right text-secondary font-semibold hidden md:table-cell"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
               >
-                {fmtMoneda(data.saldoFinalValorizado)}
+                <ValorBlur value={data.saldoFinalValorizado} render={() => fmtMoneda(data.saldoFinalValorizado)} />
               </td>
               <td colSpan={2} className="hidden lg:table-cell" />
             </tr>

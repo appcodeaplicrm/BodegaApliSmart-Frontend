@@ -28,15 +28,24 @@ export type ModuloKey =
   | 'auditoria'
   | 'tecnicos'
   | 'reportes'
+  | 'valores'
   | 'admin'
 
 export const ACCIONES = ['ver', 'crear', 'editar', 'eliminar'] as const
 export type Accion = (typeof ACCIONES)[number]
 
+/**
+ * Acciones custom de sub-módulos (no son las 4 base). Se concatenan
+ * como key final: `<modulo>.<sub>.<accion>` (ej: `tecnicos.proyectos.
+ * nodo.gestionar`). El front las renderiza con un chip "ver"-equivalente
+ * en la matriz de permisos del modal de Crear/Editar Usuario.
+ */
+export type AccionCustom = string
+
 export type SubmoduloDef = {
   key: string
   label: string
-  acciones?: readonly Accion[]
+  acciones?: readonly (Accion | AccionCustom)[]
 }
 
 export type ModuloDef = {
@@ -86,7 +95,29 @@ export const MODULOS: readonly ModuloDef[] = [
       { key: 'alertas', label: 'Alertas de Kit' },
       { key: 'devoluciones', label: 'Devoluciones' },
       { key: 'asignadas', label: 'Herramientas Asignadas' },
-      { key: 'proyectos', label: 'Proyectos' },
+      {
+        // Sub-módulo Proyectos con acciones CUSTOM (no las 4 base).
+        // Espejo del back (src/auth/permisos.catalogo.ts) y del seed
+        // (prisma/seed.ts -> PERMISOS_PROYECTOS_CUSTOM). Si agregás
+        // una acción custom nueva, tenés que sumarla en los 3 lugares.
+        key: 'proyectos',
+        label: 'Proyectos',
+        acciones: [
+          'ver',                  // tecnicos.proyectos.ver
+          'crear',                // tecnicos.proyectos.crear
+          'editar',               // tecnicos.proyectos.editar
+          'eliminar',             // tecnicos.proyectos.eliminar
+          'tecnico.asignar',      // tecnicos.proyectos.tecnico.asignar
+          'producto.inicial',     // tecnicos.proyectos.producto.inicial
+          'solicitud.crear',      // tecnicos.proyectos.solicitud.crear
+          'solicitud.aprobar',    // tecnicos.proyectos.solicitud.aprobar
+          'solicitud.entregar',   // tecnicos.proyectos.solicitud.entregar
+          'avance.registrar',     // tecnicos.proyectos.avance.registrar
+          'avance.ver',           // tecnicos.proyectos.avance.ver
+          'costo.ver',            // tecnicos.proyectos.costo.ver
+          'nodo.gestionar',       // tecnicos.proyectos.nodo.gestionar
+        ],
+      },
       { key: 'checklist', label: 'Checklist' },
     ],
   },
@@ -99,6 +130,16 @@ export const MODULOS: readonly ModuloDef[] = [
       { key: 'salidas', label: 'Salidas' },
       { key: 'kardex', label: 'Kardex' },
     ],
+  },
+  {
+    // Módulo "Valores" — permiso CROSS-MÓDULO que controla si el
+    // front muestra los precios/costos o los oculta con candado.
+    // No tiene sub-módulos: aplica a TODO el sistema (productos,
+    // proyectos, compras, movimientos, reportes, dashboard).
+    // El control de visibilidad es 100% del front.
+    key: 'valores',
+    label: 'Valores monetarios',
+    acciones: ['ver'],
   },
 ] as const
 
@@ -115,6 +156,40 @@ export const ACCION_LABELS: Record<Accion, string> = {
   crear: 'Crear',
   editar: 'Editar',
   eliminar: 'Eliminar',
+}
+
+/**
+ * Labels para acciones CUSTOM de sub-módulos (no entran en
+ * `ACCION_LABELS` porque no son parte del union `Accion`).
+ * El render de la matriz usa `ACCION_LABELS[a] ?? ACCION_LABELS_CUSTOM[a] ?? a`
+ * para mostrarlos.
+ *
+ * Si agregás una acción custom nueva, agregá su label acá también.
+ */
+export const ACCION_LABELS_CUSTOM: Record<string, string> = {
+  // tecnicos.proyectos
+  'tecnico.asignar': 'Asignar técnicos',
+  'producto.inicial': 'Dotación inicial',
+  'solicitud.crear': 'Crear solicitudes',
+  'solicitud.aprobar': 'Aprobar solicitudes',
+  'solicitud.entregar': 'Entregar solicitudes',
+  'avance.registrar': 'Registrar avance',
+  'avance.ver': 'Ver avances',
+  'costo.ver': 'Ver costos',
+  'nodo.gestionar': 'Gestionar nodos',
+}
+
+/**
+ * Helper: dado una acción (puede ser base o custom), devuelve el label
+ * legible. Si no está mapeado, devuelve la key cruda con la primera letra
+ * en mayúscula.
+ */
+export function labelAccion(a: string): string {
+  return (
+    ACCION_LABELS[a as Accion] ??
+    ACCION_LABELS_CUSTOM[a] ??
+    a.charAt(0).toUpperCase() + a.slice(1)
+  )
 }
 
 export type Permiso = string
@@ -165,7 +240,17 @@ export function todasLasKeys(): string[] {
       const accionesPadre = new Set<Accion>(['ver', ...m.acciones])
       for (const a of accionesPadre) out.push(`${m.key}.${a}`)
       for (const s of m.submodulos) {
-        for (const a of ACCIONES) out.push(`${m.key}.${s.key}.${a}`)
+        // Antes (BUG): solo se iteraban las 4 acciones base (`ACCIONES`),
+        // descartando las acciones custom declaradas en `s.acciones`
+        // (ej: `tecnicos.proyectos.solicitud.aprobar`). El front usaba
+        // `TODAS_LAS_KEYS` para hidratar la matriz de permisos de un
+        // user, así que los chips custom quedaban fuera y no se podían
+        // marcar. Ahora: usamos `s.acciones ?? ACCIONES` para incluir
+        // las custom (con `??` caemos a las 4 base si el sub no declara).
+        const accsSub = s.acciones ?? ACCIONES
+        for (const a of accsSub) {
+          out.push(`${m.key}.${s.key}.${a}`)
+        }
       }
     }
   }
@@ -176,6 +261,30 @@ export const TODAS_LAS_KEYS: readonly string[] = todasLasKeys()
 
 export function keysSubmodulo(moduloKey: ModuloKey, subKey: string): string[] {
   return ACCIONES.map((a) => `${moduloKey}.${subKey}.${a}`)
+}
+
+/**
+ * Devuelve TODAS las keys de un sub-módulo, incluyendo las acciones
+ * custom (si el sub-módulo las declara). Si no declara acciones,
+ * devuelve las 4 base (compat con `keysSubmodulo`).
+ *
+ * Útil para renderizar la matriz completa de un sub-módulo con
+ * acciones custom (ej: `tecnicos.proyectos` con sus 13 acciones).
+ */
+export function keysSubmoduloFull(moduloKey: string, sub: SubmoduloDef): string[] {
+  const accs = sub.acciones ?? ACCIONES
+  return accs.map((a) => `${moduloKey}.${sub.key}.${a}`)
+}
+
+/**
+ * Devuelve solo las acciones CUSTOM del sub-módulo (las que NO están
+ * en las 4 base). Útil para la matriz de Roles: las 4 base van en
+ * las columnas de la tabla, las custom van en una fila adicional
+ * debajo del sub-módulo.
+ */
+export function accionesCustomSubmodulo(sub: SubmoduloDef): string[] {
+  const accs = sub.acciones ?? ACCIONES
+  return accs.filter((a) => !ACCIONES.includes(a as Accion))
 }
 
 export function keyVerPadre(moduloKey: ModuloKey): string {
@@ -334,8 +443,14 @@ export function usePermisos() {
   // Esto evita que un cambio futuro del back que olvide el filtro
   // exponga roles de OTRO tenant en el dropdown del modal.
   const auth = useAuth()
+  // ⚠️ `tenantAdminId` debe ser el `adminId` del TENANT, no el `id`
+  // del usuario. Antes (ago 2026) usábamos `usuario.id` que filtraba
+  // MAL — un admin sin bodega propia nunca matcheaba con sus propios
+  // roles custom (que tienen `adminId = <tenant admin id>`, no
+  // `<usuario id>`). Fix: leer `usuario.adminId` que ahora viene en
+  // el payload de `/auth/me`.
   const tenantAdminId =
-    auth.status === 'autenticado' ? auth.sesion.usuario.id : null
+    auth.status === 'autenticado' ? auth.sesion.usuario.adminId : null
   const filtrados = tenantAdminId
     ? snap.roles.filter(
         (r) => r.adminId === null || r.adminId === tenantAdminId,

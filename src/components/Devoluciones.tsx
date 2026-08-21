@@ -596,6 +596,7 @@ export function Devoluciones() {
                               <AccionDevolucion
                                 devolucion={d}
                                 puedeRecibir={puedeRecibir}
+                                usuarioId={usuarioId}
                                 onVer={() => setDetalle(d)}
                               />
                             </div>
@@ -676,14 +677,20 @@ export function Devoluciones() {
 function AccionDevolucion({
   devolucion,
   puedeRecibir,
+  usuarioId,
   onVer,
 }: {
   devolucion: DevolucionListItem
   puedeRecibir: boolean
+  usuarioId: string | null
   onVer: () => void
 }) {
   // Bodeguero: la devolución está en tránsito → puede recibir
-  if (puedeRecibir && devolucion.estadoNombre === 'en_transito') {
+  if (
+    puedeRecibir &&
+    devolucion.estadoNombre === 'en_transito' &&
+    devolucion.operadorId !== usuarioId
+  ) {
     return (
       <button
         onClick={onVer}

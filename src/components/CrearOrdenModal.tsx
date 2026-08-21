@@ -11,6 +11,8 @@ import { SelectMobile } from './SelectMobile'
 
 type ItemKind = 'producto' | 'kit'
 
+type BodegueroDisponible = { id: string; nombre: string; rol: string }
+
 type ItemDraft = {
   uid: string
   kind: ItemKind
@@ -53,20 +55,46 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
 
   const [items, setItems] = useState<ItemDraft[]>([newItem()])
   const [motivo, setMotivo] = useState('')
+  const [bodegueros, setBodegueros] = useState<BodegueroDisponible[]>([])
+  const [bodegueroAsignadoId, setBodegueroAsignadoId] = useState('')
+  const [bodeguerosLoading, setBodeguerosLoading] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Cargar productos y kits de la bodega activa la primera vez que abrimos el modal.
+  // Cargar productos y kits de la bodega activa.
+  // ⚠️ Antes (ago 2026) solo se disparaba cuando `status === 'idle'`,
+  // pero eso dejaba un bug: si el user ya había cargado productos de
+  // OTRA bodega antes (ej: entró a Inventario con bodega A, después
+  // cambió a bodega B y abrió el modal de Solicitud), el store tenía
+  // cache de A y el modal mostraba "no hay productos" en B aunque
+  // B sí tuviera. Fix: recargar SIEMPRE que cambie el bodegaId, no
+  // solo la primera vez.
   useEffect(() => {
-    if (bodegaId && productosState.status === 'idle') {
-      void productosStore
-        .cargarPaginado({ bodegaId, page: 1, pageSize: 100 })
-        .catch(() => undefined)
-    }
-    if (bodegaId && kitsState.status === 'idle') {
-      void kitsStore.cargar(bodegaId).catch(() => undefined)
-    }
-  }, [bodegaId, productosState.status, kitsState.status])
+    if (!bodegaId) return
+    void productosStore
+      .cargarPaginado({ bodegaId, page: 1, pageSize: 100 })
+      .catch(() => undefined)
+    void kitsStore.cargar(bodegaId).catch(() => undefined)
+    // Solo dependemos de `bodegaId` (no del status), así forzamos
+    // refetch cuando cambia la bodega activa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bodegaId])
+
+  useEffect(() => {
+    if (!bodegaId) return
+    setBodeguerosLoading(true)
+    setBodegueroAsignadoId('')
+    void api.get<BodegueroDisponible[]>(`/pedidos/bodegueros/disponibles?bodegaId=${encodeURIComponent(bodegaId)}`)
+      .then((data) => {
+        setBodegueros(data)
+        if (data.length === 1) setBodegueroAsignadoId(data[0].id)
+      })
+      .catch((err) => {
+        setBodegueros([])
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los bodegueros.')
+      })
+      .finally(() => setBodeguerosLoading(false))
+  }, [bodegaId])
 
   // Hidratar la lista de bodegas para poder mostrar el nombre (no el id).
   useEffect(() => {
@@ -131,6 +159,14 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
       setError('No hay sesión activa.')
       return
     }
+    if (bodegueros.length === 0) {
+      setError('No hay un bodeguero disponible para recibir la solicitud.')
+      return
+    }
+    if (!bodegueroAsignadoId) {
+      setError('Selecciona el bodeguero que recibirá la solicitud.')
+      return
+    }
     // Items válidos: cada línea debe tener su id (productoId o kitId según kind) y cantidad > 0
     const filled = items.filter((it) => {
       if (it.cantidad <= 0) return false
@@ -149,6 +185,7 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
     try {
       await api.post('/pedidos', {
         bodegaId,
+        bodegueroAsignadoId,
         motivo: motivo.trim() || undefined,
         items: filled.map((it) => {
           if (it.kind === 'kit') {
@@ -197,7 +234,7 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
           <button
             type="submit"
             form="crear-orden-form"
-            disabled={submitting}
+            disabled={submitting || bodeguerosLoading || !bodegueroAsignadoId}
             className="flex-1 min-h-[44px] py-2.5 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             style={{ borderRadius: '0.25rem' }}
           >
@@ -217,6 +254,29 @@ export function CrearOrdenModal({ onClose, onCreated }: CrearOrdenModalProps) {
         <div className="grid grid-cols-2 gap-3">
           <InfoCell label="Operador" value={operadorNombre} sub={rol} />
           <InfoCell label="Bodega" value={bodegaNombre} />
+        </div>
+
+        <div>
+          <label className="block text-xs text-muted-foreground tracking-widest uppercase mb-1.5 font-mono">
+            Bodeguero que recibirá la solicitud
+          </label>
+          <SelectMobile
+            value={bodegueroAsignadoId}
+            onChange={setBodegueroAsignadoId}
+            options={bodegueros.map((bodeguero) => ({
+              value: bodeguero.id,
+              label: `${bodeguero.nombre} · ${bodeguero.rol}`,
+            }))}
+            placeholder={bodeguerosLoading ? 'Buscando bodegueros…' : 'Seleccionar bodeguero…'}
+            disabled={bodeguerosLoading || bodegueros.length <= 1}
+            label="Bodeguero"
+            className="w-full"
+          />
+          {!bodeguerosLoading && bodegueros.length === 0 && (
+            <p className="mt-1.5 text-[11px] text-primary font-mono">
+              Esta bodega no tiene usuarios con permisos para ver y gestionar Despachos.
+            </p>
+          )}
         </div>
 
         <div>

@@ -2,7 +2,9 @@ import { getSubmodulo, SUBMODULOS_TECNICOS } from './tecnicos/tecnicos'
 import { SubmoduloView } from './tecnicos/SubmoduloView'
 import { Ordenes } from './Ordenes'
 import { ChecklistView } from './checklist/ChecklistView'
-import { Link } from 'react-router-dom'
+import { ProyectosView } from './proyectos/ProyectosView'
+import { ProyectoDetalle } from './proyectos/ProyectoDetalle'
+import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { PageHeader } from './PageHeader'
 
@@ -11,6 +13,7 @@ type TecnicosProps = {
 }
 
 export function Tecnicos({ subKey }: TecnicosProps) {
+  const params = useParams<{ id?: string }>()
   // 'Solicitudes de Recursos' usa la pantalla completa de Órdenes
   if (subKey === 'solicitudes') {
     return <Ordenes />
@@ -19,6 +22,11 @@ export function Tecnicos({ subKey }: TecnicosProps) {
   // SubmoduloView genérico porque tiene tabs internos y dos secciones).
   if (subKey === 'checklist') {
     return <ChecklistView />
+  }
+  // 'Proyectos' tiene su propia vista completa. Si la URL tiene
+  // un :id, renderizamos el detalle; si no, el grid de cards.
+  if (subKey === 'proyectos') {
+    return params.id ? <ProyectoDetalle /> : <ProyectosView />
   }
 
   // Convertir el path segment (ej: "solicitudes") al key completo (ej: "tecnicos:solicitudes")

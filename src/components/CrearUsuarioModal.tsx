@@ -24,6 +24,8 @@ import {
   MODULOS,
   ACCIONES,
   ACCION_LABELS,
+  labelAccion,
+  accionesCustomSubmodulo,
   type Permiso,
 } from '../store/permisos'
 import { useBodegas } from '../store/bodegas'
@@ -668,7 +670,7 @@ export function CrearUsuarioModal({ onClose, onCreated }: CrearUsuarioModalProps
                                                 }`}
                                                 style={{ borderRadius: '0.15rem' }}
                                               >
-                                                {ACCION_LABELS[a]}
+                                                {labelAccion(a)}
                                               </button>
                                             )
                                           })}
@@ -685,8 +687,16 @@ export function CrearUsuarioModal({ onClose, onCreated }: CrearUsuarioModalProps
                                             // padre y suele tener solo "ver").
                                             return (
                                               <div key={s.key}>
-                                                <div className="text-[11px] text-muted-foreground mb-1">
-                                                  {s.label}
+                                                <div className="text-[11px] text-muted-foreground mb-1 flex items-center gap-2">
+                                                  <span>{s.label}</span>
+                                                  {accionesCustomSubmodulo(s).length > 0 && (
+                                                    <span
+                                                      className="text-[9px] text-muted-foreground/70"
+                                                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                                                    >
+                                                      (+{accionesCustomSubmodulo(s).length} custom)
+                                                    </span>
+                                                  )}
                                                 </div>
                                                 <div className="flex flex-wrap gap-1.5 pl-2">
                                                   {ACCIONES.map((a) => {
@@ -722,11 +732,58 @@ export function CrearUsuarioModal({ onClose, onCreated }: CrearUsuarioModalProps
                                                         }`}
                                                         style={{ borderRadius: '0.15rem' }}
                                                       >
-                                                        {ACCION_LABELS[a]}
+                                                        {labelAccion(a)}
                                                       </button>
                                                     )
                                                   })}
                                                 </div>
+                                                {/* Acciones custom granulares (no entran en las 4 base).
+                                                    Se renderizan como chips extra debajo de los base. */}
+                                                {(() => {
+                                                  const accsCustom = accionesCustomSubmodulo(s)
+                                                  if (accsCustom.length === 0) return null
+                                                  return (
+                                                    <div className="flex flex-wrap gap-1.5 pl-2 mt-1.5">
+                                                      {accsCustom.map((a) => {
+                                                        const key = `${m.key}.${s.key}.${a}` as Permiso
+                                                        const on = permisosEfectivos.has(key)
+                                                        return (
+                                                          <button
+                                                            key={a}
+                                                            type="button"
+                                                            onClick={() => {
+                                                              setAsignaciones((prev) =>
+                                                                prev.map((p, idx) => {
+                                                                  if (idx !== i) return p
+                                                                  const base =
+                                                                    p.permisosOverride ??
+                                                                    new Set(
+                                                                      permisosStore.roles.obtener(
+                                                                        p.rolKey,
+                                                                      )?.permisos ?? [],
+                                                                    )
+                                                                  const next = new Set(base)
+                                                                  if (on) next.delete(key)
+                                                                  else next.add(key)
+                                                                  return { ...p, permisosOverride: next }
+                                                                }),
+                                                              )
+                                                            }}
+                                                            disabled={cargando}
+                                                            className={`min-h-[28px] px-2 py-0.5 text-[10px] border transition-colors ${
+                                                              on
+                                                                ? 'border-secondary/50 bg-secondary/15 text-secondary'
+                                                                : 'border-border text-muted-foreground hover:border-foreground/30'
+                                                            }`}
+                                                            style={{ borderRadius: '0.15rem' }}
+                                                          >
+                                                            {labelAccion(a)}
+                                                          </button>
+                                                        )
+                                                      })}
+                                                    </div>
+                                                  )
+                                                })()}
                                               </div>
                                             )
                                           })}

@@ -20,8 +20,11 @@ import {
   MODULOS,
   ACCIONES,
   ACCION_LABELS,
+  labelAccion,
   keyVerPadre,
   keysSubmodulo,
+  keysSubmoduloFull,
+  accionesCustomSubmodulo,
   type ModuloKey,
   type ModuloDef,
   type SubmoduloDef,
@@ -339,7 +342,9 @@ function RolCard({
         if (m.acciones.some((a) => rol.permisos.includes(`${m.key}.${a}`))) modulos++
       } else {
         for (const s of m.submodulos) {
-          if (keysSubmodulo(m.key, s.key).some((k) => rol.permisos.includes(k))) {
+          // Usamos `keysSubmoduloFull` para incluir las acciones custom
+          // del sub-módulo (ej: `tecnicos.proyectos.nodo.gestionar`).
+          if (keysSubmoduloFull(m.key, s).some((k) => rol.permisos.includes(k))) {
             submodulos++
           }
         }
@@ -710,7 +715,7 @@ function ModuloAccionesGrid({
               style={{ borderRadius: '0.25rem' }}
             >
               {has && <Check size={12} className="inline mr-1 -mt-0.5" />}
-              {ACCION_LABELS[a as keyof typeof ACCION_LABELS] ?? a}
+              {labelAccion(a)}
             </button>
           )
         })}
@@ -787,7 +792,7 @@ function SubmoduloAcciones({
               style={{ borderRadius: '0.25rem' }}
             >
               {has && <Check size={12} className="inline mr-1 -mt-0.5" />}
-              {ACCION_LABELS[accion as Accion] ?? accion}
+              {labelAccion(accion)}
             </button>
           )
         })}
@@ -952,54 +957,107 @@ function ModuloPadreGrupo({
       </tr>
       {isOpen &&
         submodulos.map((s) => {
-          const subKeys = keysSubmodulo(modulo.key, s.key).filter((k) => permisosDisponibles.has(k))
-          const allSubOn = subKeys.every((k) => selected.has(k))
+          // `subKeys` ahora incluye las acciones custom declaradas en
+          // el sub-módulo (no solo las 4 base). Esto hace que el
+          // toggle "Activar todo" las marque/desmarque todas.
+          const subKeys = keysSubmoduloFull(modulo.key, s).filter((k) => permisosDisponibles.has(k))
+          // Las acciones base se renderizan en las 4 columnas de la tabla.
+          const subKeysBase = ACCIONES.map((a) => `${modulo.key}.${s.key}.${a}`).filter((k) => permisosDisponibles.has(k))
+          // Las acciones custom se renderizan como chips en una fila extra
+          // debajo (porque no entran en las 4 columnas de la tabla).
+          const accsCustom = accionesCustomSubmodulo(s)
+          const subKeysCustom = accsCustom.map((a) => `${modulo.key}.${s.key}.${a}`).filter((k) => permisosDisponibles.has(k))
+          const allSubOn = subKeys.length > 0 && subKeys.every((k) => selected.has(k))
           const someSubOn = subKeys.some((k) => selected.has(k))
           return (
-            <tr
-              key={`${modulo.key}.${s.key}`}
-              className="border-b border-border last:border-b-0 hover:bg-card/40"
-            >
-              <td
-                className="px-3 py-2 text-sm text-muted-foreground pl-9"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
+            <>
+              <tr
+                key={`${modulo.key}.${s.key}`}
+                className="border-b border-border hover:bg-card/40"
               >
-                <span className="inline-flex items-center gap-2">
-                  <span
-                    className="w-3 h-px bg-border"
-                    aria-hidden
-                  />
-                  {s.label}
-                </span>
-              </td>
-              {ACCIONES.map((a) => {
-                const p: Permiso = `${modulo.key}.${s.key}.${a}`
-                if (!permisosDisponibles.has(p)) return <td key={a} className="text-center px-3 py-2 text-muted-foreground/40">—</td>
-                const has = selected.has(p)
-                return (
-                  <td key={a} className="text-center px-3 py-2">
-                    <CellToggle
-                      active={has}
-                      onClick={() => onToggleSub(p)}
-                      title={p}
+                <td
+                  className="px-3 py-2 text-sm text-muted-foreground pl-9"
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="w-3 h-px bg-border"
+                      aria-hidden
                     />
+                    {s.label}
+                    {subKeysCustom.length > 0 && (
+                      <span
+                        className="text-[9px] text-muted-foreground/70 ml-1"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        (+{subKeysCustom.length} custom)
+                      </span>
+                    )}
+                  </span>
+                </td>
+                {ACCIONES.map((a) => {
+                  const p: Permiso = `${modulo.key}.${s.key}.${a}`
+                  if (!permisosDisponibles.has(p)) return <td key={a} className="text-center px-3 py-2 text-muted-foreground/40">—</td>
+                  const has = selected.has(p)
+                  return (
+                    <td key={a} className="text-center px-3 py-2">
+                      <CellToggle
+                        active={has}
+                        onClick={() => onToggleSub(p)}
+                        title={p}
+                      />
+                    </td>
+                  )
+                })}
+                <td className="text-center px-3 py-2">
+                  <CellToggle
+                    active={allSubOn}
+                    partial={someSubOn && !allSubOn}
+                    onClick={() => {
+                      for (const k of subKeys) {
+                        if (allSubOn && selected.has(k)) onToggleSub(k)
+                        if (!allSubOn && !selected.has(k)) onToggleSub(k)
+                      }
+                    }}
+                    title="Activar todo el sub-módulo"
+                  />
+                </td>
+              </tr>
+              {subKeysCustom.length > 0 && (
+                <tr
+                  key={`${modulo.key}.${s.key}.custom`}
+                  className="border-b border-border last:border-b-0 bg-muted/20"
+                >
+                  <td
+                    colSpan={ACCIONES.length + 2}
+                    className="px-3 py-2 pl-12"
+                  >
+                    <div className="flex flex-wrap gap-1.5">
+                      {subKeysCustom.map((p) => {
+                        const accion = p.split('.').slice(2).join('.')
+                        const has = selected.has(p)
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => onToggleSub(p)}
+                            title={p}
+                            className={`min-h-[28px] px-2 py-0.5 text-[10px] border transition-colors ${
+                              has
+                                ? 'border-secondary/50 bg-secondary/15 text-secondary'
+                                : 'border-border text-muted-foreground hover:border-foreground/30'
+                            }`}
+                            style={{ borderRadius: '0.15rem' }}
+                          >
+                            {labelAccion(accion)}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </td>
-                )
-              })}
-              <td className="text-center px-3 py-2">
-                <CellToggle
-                  active={allSubOn}
-                  partial={someSubOn && !allSubOn}
-                  onClick={() => {
-                    for (const k of subKeys) {
-                      if (allSubOn && selected.has(k)) onToggleSub(k)
-                      if (!allSubOn && !selected.has(k)) onToggleSub(k)
-                    }
-                  }}
-                  title="Activar todo el sub-módulo"
-                />
-              </td>
-            </tr>
+                </tr>
+              )}
+            </>
           )
         })}
     </>

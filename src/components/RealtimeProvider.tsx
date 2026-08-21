@@ -30,6 +30,7 @@ import { movimientosStore } from '../store/movimientos'
 import { productosStore } from '../store/productos'
 import { pedidosStore } from '../store/pedidos'
 import { devolucionesStore } from '../store/devoluciones'
+import { proyectosStore } from './proyectos/store'
 import { bodegaActivaStore, useBodegaActiva } from '../store/bodegaActiva'
 import { dashboardStore } from '../store/dashboard'
 import { kitsStore } from '../store/kits'
@@ -172,6 +173,103 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   })
   useRealtimeEvent('devolucion.cambiada', (e) => {
     devolucionesStore.handleDevolucionCambiada(e as any)
+  })
+
+  // ── Submódulo Proyectos (Capa 9) ─────────────────────────
+  useRealtimeEvent('proyecto.creado', (e) => {
+    proyectosStore.handleProyectoCreado(e.payload as any)
+  })
+  useRealtimeEvent('proyecto.estado-cambiado', (e) => {
+    proyectosStore.handleEstadoCambiado(e.payload as any)
+  })
+  useRealtimeEvent('proyecto.tecnico-asignado', (e) => {
+    proyectosStore.handleProyectoActualizado({
+      proyectoId: (e.payload as any).proyectoId,
+      bodegaId: e.bodegaId,
+    })
+  })
+  useRealtimeEvent('proyecto.producto-asignado', (e) => {
+    proyectosStore.handleProyectoActualizado({
+      proyectoId: (e.payload as any).proyectoId,
+      bodegaId: e.bodegaId,
+    })
+  })
+  useRealtimeEvent('proyecto.producto-eliminado', (e) => {
+    proyectosStore.handleProyectoActualizado({
+      proyectoId: (e.payload as any).proyectoId,
+      bodegaId: e.bodegaId,
+    })
+  })
+  useRealtimeEvent('solicitud-bodega.creada', (e) => {
+    // Refetch del listado de proyectos (contadores).
+    void proyectosStore.recargar()
+    // Notificamos a componentes específicos del proyecto abierto
+    // (detalle del proyecto, bandeja del bodeguero, etc.) para que
+    // refresquen su lista de solicitudes. Cada componente filtra por
+    // su propio `id` o bodegaId. Mismo patrón que `realtime:catalogo`.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('realtime:proyecto-solicitud', {
+          detail: {
+            tipo: 'creada',
+            proyectoId: (e.payload as any).proyectoId,
+            solicitudId: (e.payload as any).id,
+            bodegaId: e.bodegaId,
+          },
+        }),
+      )
+      // Para la bandeja del bodeguero (que lista TODAS las solicitudes
+      // de la bodega, no por proyecto).
+      window.dispatchEvent(
+        new CustomEvent('realtime:solicitud-bodega', {
+          detail: { tipo: 'creada', bodegaId: e.bodegaId },
+        }),
+      )
+    }
+  })
+  useRealtimeEvent('solicitud-bodega.estado-cambiado', (e) => {
+    void proyectosStore.recargar()
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('realtime:proyecto-solicitud', {
+          detail: {
+            tipo: 'estado-cambiado',
+            proyectoId: (e.payload as any).proyectoId,
+            solicitudId: (e.payload as any).id,
+            estado: (e.payload as any).estado,
+            bodegaId: e.bodegaId,
+          },
+        }),
+      )
+      window.dispatchEvent(
+        new CustomEvent('realtime:solicitud-bodega', {
+          detail: { tipo: 'estado-cambiado', bodegaId: e.bodegaId },
+        }),
+      )
+    }
+  })
+  useRealtimeEvent('proyecto.avance-registrado', (e) => {
+    proyectosStore.handleProyectoActualizado({
+      proyectoId: (e.payload as any).proyectoId,
+      bodegaId: e.bodegaId,
+    })
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('realtime:proyecto-avance', {
+          detail: {
+            tipo: 'registrado',
+            proyectoId: (e.payload as any).proyectoId,
+            bodegaId: e.bodegaId,
+          },
+        }),
+      )
+    }
+  })
+  useRealtimeEvent('proyecto.avance-eliminado', (e) => {
+    proyectosStore.handleProyectoActualizado({
+      proyectoId: (e.payload as any).proyectoId,
+      bodegaId: e.bodegaId,
+    })
   })
 
   // ── Paso 3: cobertura completa de catálogos + multi-user ────

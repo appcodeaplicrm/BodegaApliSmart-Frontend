@@ -11,6 +11,10 @@ export type UsuarioActivo = {
   /** Nombre legible del rol (ej: "Administrador", "Operador"). Es el
    * que se muestra en UI (sidebar, chips, etc.). */
   rolNombre?: string
+  /** ID del tenant (admin dueño de la empresa). `null` solo para
+   * superadmin. Lo usa el front para filtrar roles/custom-permissions
+   * del tenant actual. NO confundir con `id` (que es el user.id). */
+  adminId: string | null
   bodegas: string[]
   bodegaId: string | null
   fotoUrl?: string | null
@@ -82,6 +86,8 @@ export const authStore = {
   async bootstrap(): Promise<boolean> {
     try {
       const res = await api.get<Sesion>('/auth/me')
+      // Los logs de diagnóstico están en el back (auth.controller.ts#sesion).
+      // No duplicamos aquí para no contaminar la consola del navegador.
       setEstado({ status: 'autenticado', sesion: res })
       return true
     } catch (err) {
@@ -96,6 +102,8 @@ export const authStore = {
 
   async login(email: string, password: string): Promise<void> {
     const res = await api.post<Sesion>('/auth/login', { email, password })
+    // Los logs de diagnóstico están en el back (auth.controller.ts#sesion).
+    // No duplicamos aquí para no contaminar la consola del navegador.
     setEstado({ status: 'autenticado', sesion: res })
   },
 

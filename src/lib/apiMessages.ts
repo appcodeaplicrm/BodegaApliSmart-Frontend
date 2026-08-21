@@ -74,6 +74,9 @@ const RULES: Rule[] = [
   { match: /^PATCH \/clientes\/[^/]+/, message: 'Cliente actualizado' },
   { match: /^DELETE \/clientes\/[^/]+/, message: 'Cliente eliminado' },
 
+  // ── Proyectos (Capa 9) ──────────────────────────────────
+  { match: /^POST \/proyectos\b/, message: 'Proyecto creado' },
+
   // ── Usuarios / Roles / Permisos ────────────────────────
   { match: /^POST \/usuarios\b/, message: 'Usuario creado' },
   { match: /^PATCH \/usuarios\/[^/]+/, message: 'Usuario actualizado' },
@@ -93,6 +96,17 @@ const RULES: Rule[] = [
   { match: /^POST \/bodegas\b/, message: 'Bodega creada' },
   { match: /^PATCH \/bodegas\/[^/]+/, message: 'Bodega actualizada' },
   { match: /^DELETE \/bodegas\/[^/]+/, message: 'Bodega eliminada' },
+
+  // ── Proyectos (Capa 9) ──────────────────────────────────
+  // Los nodos del recorrido se crean en un loop (al crear un
+  // proyecto con ruta planificada) y disparar un toast por
+  // cada uno satura la UI. Lo manejamos en `mensajeExito()`
+  // con un check explícito de la URL para devolver `null`.
+  // (Las reglas de abajo son para los endpoints que SÍ queremos
+  // que muestren toast.)
+  { match: /^POST \/proyectos\/[^/]+\/ruta\/planificar\b/, message: 'Recorrido planificado' },
+  // POST /proyectos/:id/nodos y POST /proyectos/ruta/planificar-preview
+  // → silenciados (ver lógica en `mensajeExito()`).
 
   // ── Checklist ──────────────────────────────────────────
   { match: /^POST \/checklist\/plantillas\b/, message: 'Plantilla creada' },
@@ -129,6 +143,34 @@ export function mensajeExito(method: string, path: string): string | null {
   // No mostramos toast en operaciones internas de auth (logout, login,
   // refresh) — esas tienen su propio flujo de UX.
   if (path.startsWith('/auth/')) return null
+
+  // Silenciar endpoints que se llaman en loop y saturan la UI con
+  // toasts duplicados. Si el caller quiere un toast en estos casos,
+  // debe mostrarlo manualmente (no usamos `opts.silent` porque
+  // sería agregar un parámetro nuevo solo para estos 2 casos).
+  if (method.toUpperCase() === 'POST') {
+    if (/^\/proyectos\/[^/]+\/nodos\b/.test(path)) return null
+    if (/^\/proyectos\/ruta\/planificar-preview\b/.test(path)) return null
+  }
+
+  // Silenciar TODO el módulo de chat. Los POSTs del chat son
+  // acciones internas (marcarLeido se dispara solo al ver un
+  // mensaje del otro, toggleReaccion no necesita confirmación,
+  // abrirConversacion no muestra "Conversación creada"). El
+  // feedback visual lo da la propia UI del chat (la burbuja
+  // aparece, el check de leído se actualiza, etc). Mostrar
+  // "Guardado" por cada uno satura la UI cuando llegan muchos
+  // mensajes seguidos.
+  if (path.startsWith('/chat/')) return null
+
+  // Silenciar todo lo que tenga que ver con la sesión de voz del
+  // asistente de IA. La librería @deepgram/agents y nuestro wrapper
+  // disparan varios `api.post` internos (sesión, refresh de token,
+  // tools, etc.) que NO son acciones del user y NO deben mostrar
+  // toast "Guardado". Si el asistente hace algo visible (ej. crear
+  // un producto), el back emite un realtime y los stores lo
+  // manejan con sus propios flujos.
+  if (path.startsWith('/auditoria-inteligente/voz')) return null
 
   const key = `${method.toUpperCase()} ${path}`
   for (const rule of RULES) {

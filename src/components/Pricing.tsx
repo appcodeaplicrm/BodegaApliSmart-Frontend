@@ -71,6 +71,10 @@ function featureABullet(code: string, limit: number | null): string {
         : `hasta ${limit} roles personalizados`
     case 'ai.audit':
       return 'auditoría inteligente con IA'
+    case 'ai.integrated':
+      return 'IA integrada y lista para usar'
+    case 'ai.byok':
+      return 'panel para configurar tu propia IA'
     default:
       // Feature desconocida: la mostramos tal cual viene del back
       return limit == null ? code : `${code} (máx. ${limit})`

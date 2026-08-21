@@ -116,6 +116,46 @@ body {
   }
 }
 
+@keyframes chatTypingPulse {
+  0%, 60%, 100% {
+    opacity: 0.35;
+    transform: translateY(0) scale(0.9);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1);
+  }
+}
+
+.chat-typing-bubble {
+  border-radius: 1rem 1rem 1rem 0.3rem;
+}
+
+.chat-typing-bubble::before {
+  content: '';
+  position: absolute;
+  left: -0.28rem;
+  bottom: -0.08rem;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  background: #333333;
+  border-left: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+}
+
+.chat-typing-dot {
+  display: block;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #a3a3a3;
+  animation: chatTypingPulse 1.15s ease-in-out infinite;
+}
+
+.chat-typing-dot:nth-child(2) { animation-delay: 0.14s; }
+.chat-typing-dot:nth-child(3) { animation-delay: 0.28s; }
+
 .login-particle {
   animation-name: loginParticleFloat;
   animation-timing-function: ease-in-out;
@@ -128,4 +168,36 @@ body {
     animation: none !important;
   }
   .login-particle { animation: none !important; opacity: 0.25; }
+  .chat-typing-dot { animation: none !important; opacity: 0.7; }
+}
+
+/* ── Leaflet dentro de modales ────────────────────────────── */
+/* Por default leaflet.css pone z-index 200/400/500/600/700/1000 */
+/* en sus panes y controles. Cuando el mapa está adentro de un  */
+/* modal (z-50) eso se "escapa" y termina tapando el overlay.   */
+/* Aplastamos todo al rango [0..2] dentro del scope.           */
+.proyecto-mapa-scope,
+.proyecto-mapa-scope .leaflet-pane,
+.proyecto-mapa-scope .leaflet-top,
+.proyecto-mapa-scope .leaflet-bottom,
+.proyecto-mapa-scope .leaflet-control,
+.proyecto-mapa-scope .leaflet-control-zoom,
+.proyecto-mapa-scope .leaflet-popup,
+.proyecto-mapa-scope .leaflet-marker-pane,
+.proyecto-mapa-scope .leaflet-overlay-pane,
+.proyecto-mapa-scope .leaflet-shadow-pane,
+.proyecto-mapa-scope .leaflet-marker-icon,
+.proyecto-mapa-scope .leaflet-image-layer,
+.proyecto-mapa-scope .leaflet-layer,
+.proyecto-mapa-scope .leaflet-tile,
+.proyecto-mapa-scope .leaflet-tile-container {
+  z-index: 0 !important;
+}
+.proyecto-mapa-scope .leaflet-control-zoom {
+  z-index: 1 !important;
+  position: absolute !important;
+}
+.proyecto-mapa-scope .leaflet-popup {
+  z-index: 2 !important;
+  position: absolute !important;
 }

@@ -1,5 +1,26 @@
 import { useSyncExternalStore } from 'react'
 import { api, ApiError } from '../lib/api'
+import { authStore } from './auth'
+
+/**
+ * Filtra el query para que quien entra únicamente como técnico vea
+ * SUS propios pedidos. La bandeja general se habilita por el permiso
+ * efectivo `despachos.ver`, no por el nombre fijo del rol: un rol
+ * delegado con ese permiso también debe ver todas las solicitudes de
+ * la bodega activa.
+ *
+ * Mismo patrón que `proyectos/store.ts#applyUserScope`. Si el query
+ * ya traía un `operadorId` explícito (ej: el admin filtró por un
+ * operador específico desde la UI), NO lo pisamos.
+ */
+function applyUserScope(query: PedidosQuery): PedidosQuery {
+  const auth = authStore.getSnapshot()
+  if (auth.status !== 'autenticado') return query
+  const { usuario } = auth.sesion
+  if (authStore.tienePermisos(['despachos.ver'])) return query
+  if (query.operadorId) return query
+  return { ...query, operadorId: usuario.id }
+}
 
 /* ─── Tipos ───────────────────────────────────── */
 
@@ -395,10 +416,14 @@ export const pedidosStore = {
 
   /** Carga una página de pedidos con filtros opcionales. */
   async cargarPaginado(query: PedidosQuery): Promise<PageResult<PedidoListItem>> {
-    lastQuery = query
+    // Aplica el scope por user (admin ve todos, otros solo los suyos).
+    // NO re-aplicamos en `recargarSilencioso` para no recalcular el
+    // scope en cada refetch silencioso (ya quedó en el lastQuery).
+    const scopedQuery = applyUserScope(query)
+    lastQuery = scopedQuery
     setEstado({ status: 'cargando' })
     try {
-      const result = await this.fetchPaginado(query)
+      const result = await this.fetchPaginado(scopedQuery)
       const pedidos = result.data.map(toListItem)
       const pageResult: PageResult<PedidoListItem> = {
         data: pedidos,

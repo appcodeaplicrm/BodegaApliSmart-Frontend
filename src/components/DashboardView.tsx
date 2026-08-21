@@ -29,6 +29,7 @@ import {
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useDashboard, dashboardStore, type DashboardResumen } from '../store/dashboard'
 import { HeaderNotificationsButton } from './HeaderNotificationsButton'
+import { ValorBlur } from '../lib/valorBlur'
 
 const COLORS = ['#E8593F', '#ABF768', '#F5F2EC', '#FFB86F', '#9D7EE8', '#5AC8FA']
 
@@ -206,7 +207,7 @@ function DashboardContenido() {
           icon={DollarSign}
           color="emerald"
           label="Valor stock"
-          value={formatPesos(r.kpis.valorInventario)}
+          value={<ValorBlur value={r.kpis.valorInventario} render={() => formatPesos(r.kpis.valorInventario)} />}
           sub="precio unitario × cantidad"
         />
         <Kpi
@@ -263,7 +264,10 @@ function DashboardContenido() {
             <div className="shrink-0 sm:min-w-36 sm:text-right">
               <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Total del periodo</div>
               <div className="mt-1 text-xl text-primary" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
-                {formatPesosPreciso(valorSalidas.reduce((total, periodo) => total + periodo.total, 0))}
+                <ValorBlur
+                  value={valorSalidas.reduce((total, periodo) => total + periodo.total, 0)}
+                  render={() => formatPesosPreciso(valorSalidas.reduce((total, periodo) => total + periodo.total, 0))}
+                />
               </div>
             </div>
           </div>
@@ -583,7 +587,7 @@ function Kpi({
   icon: typeof Package
   color: KpiColor
   label: string
-  value: string
+  value: React.ReactNode
   sub?: string
 }) {
   return (
@@ -790,7 +794,7 @@ function ValorSalidasTooltip({
         {formatFechaLarga(dia.fecha)}
       </div>
       <div className="mt-1 text-lg text-primary" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900 }}>
-        {formatPesosPreciso(dia.total)}
+        <ValorBlur value={dia.total} render={() => formatPesosPreciso(dia.total)} />
       </div>
       <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
         {dia.detalles.map((detalle) => (
@@ -801,7 +805,9 @@ function ValorSalidasTooltip({
                 {detalle.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 3 })} {detalle.unidad}
               </div>
             </div>
-            <div className="shrink-0 text-xs font-semibold text-foreground">{formatPesosPreciso(detalle.valor)}</div>
+            <div className="shrink-0 text-xs font-semibold text-foreground">
+              <ValorBlur value={detalle.valor} render={() => formatPesosPreciso(detalle.valor)} />
+            </div>
           </div>
         ))}
       </div>

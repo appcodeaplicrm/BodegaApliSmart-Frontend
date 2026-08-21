@@ -12,6 +12,7 @@ import { Devoluciones } from './Devoluciones'
 import { Usuarios } from './Usuarios'
 import { Roles } from './Roles'
 import { Tecnicos, TecnicosIndex } from './Tecnicos'
+import { ProyectoDetalle } from './proyectos/ProyectoDetalle'
 import { Reportes, ReportesIndex } from './Reportes'
 import { PermissionGate } from './PermissionGate'
 import { Forbidden } from './Forbidden'
@@ -60,7 +61,7 @@ type DashboardProps = {
  *   /tecnicos/solicitudes   → view="tecnicos" subKey="solicitudes" → sub-módulo
  */
 export function Dashboard({ view = 'dashboard', onExit }: DashboardProps) {
-  const params = useParams<{ subKey?: string }>()
+  const params = useParams<{ subKey?: string; id?: string }>()
   const bodegasState = useBodegas()
   const activaId = useBodegaActiva()
   const auth = useAuth()
@@ -192,10 +193,23 @@ export function Dashboard({ view = 'dashboard', onExit }: DashboardProps) {
 
       {view === 'tecnicos' && (
         <PermissionGate
-          permiso={params.subKey ? getTecnicosSubPermiso(params.subKey) : 'tecnicos.ver'}
+          permiso={
+            // Detalle de proyecto (URL /tecnicos/proyectos/:id, que
+            // matchea la ruta específica y deja params = { id })
+            // o vista de cards de sub-módulo (URL /tecnicos/proyectos,
+            // que matchea la genérica y deja params = { subKey: 'proyectos' }).
+            params.id
+              ? 'tecnicos.proyectos.ver'
+              : params.subKey
+                ? getTecnicosSubPermiso(params.subKey)
+                : 'tecnicos.ver'
+          }
           fallback={<Forbidden />}
         >
-          {params.subKey ? (
+          {/* Detalle de un proyecto específico: /tecnicos/proyectos/:id */}
+          {params.id ? (
+            <ProyectoDetalle />
+          ) : params.subKey ? (
             <Tecnicos subKey={params.subKey} />
           ) : (
             <TecnicosIndex />

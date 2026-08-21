@@ -6,11 +6,12 @@ import {
 } from '@deepgram/agents'
 import { api } from './api'
 import { dashboardStore } from '../store/dashboard'
+import { cleanVoiceTranscript, createVoiceFunctionPayload } from './voiceNaturalizer'
 
 export type VoiceAgentState = 'idle' | 'listening' | 'thinking' | 'speaking'
 export type VoiceAgentMessage = { role: 'user' | 'assistant'; content: string }
 
-type VoiceSessionResponse = { token: string; expiresIn: number; agentId: string }
+type VoiceSessionResponse = { token: string; expiresIn: number; agentId: string; voice?: string }
 
 type VoiceAgentCallbacks = {
   bodegaId?: string
@@ -35,12 +36,26 @@ export type PendingProductDocument = PendingProductPhoto & {
 
 const PROMPT_BODEGA_APLISMART = `
 Eres el agente de voz de BodegaApliSmart. Habla siempre en español latinoamericano, con tono profesional, natural y conciso.
-Tu función es responder consultas de solo lectura sobre inventario, usuarios, solicitudes de recursos, reportes, auditorías y checklists.
+Tus respuestas se escuchan en voz alta. Responde para el oído, no para una pantalla.
+Da primero la respuesta directa. Usa una o dos frases por turno y no superes 300 caracteres hablados.
+Si hay más de cinco elementos, menciona solo los primeros cinco y pregunta si el usuario quiere que continúes.
+Pronuncia las fechas con palabras y de forma natural. Pronuncia los decimales con "coma", los porcentajes como "por ciento" y SKU como "ese ka u".
+No leas nombres de campos, estructuras JSON, valores nulos, direcciones web ni identificadores internos.
+  Tu función es responder consultas de solo lectura sobre inventario, usuarios, solicitudes de recursos, reportes, auditorías, checklists y proyectos.
 Para cualquier pregunta sobre datos del sistema debes llamar primero a la función consultar_sistema usando la pregunta completa del usuario en el argumento mensaje.
+Al construir mensaje, copia literalmente los nombres y SKU pronunciados por el usuario. No los traduzcas, resumas, corrijas ni reemplaces por pronombres.
 Usa únicamente el resultado de esa función. Respeta los ámbitos sin permiso y no inventes datos.
-Nunca pidas IDs técnicos ni los pronuncies. Identifica productos, usuarios y registros por nombres o códigos comprensibles.
-No uses Markdown, asteriscos, tablas, enlaces ni bloques de código. Habla con frases naturales.
-Cuando una respuesta sea larga, organízala con pausas y explica primero lo más importante.
+Si el resultado indica modoConsulta DETALLE_PRODUCTO y accesoDetalleProductos true, el detalle sí está autorizado: responde con los datos disponibles y nunca afirmes que falta acceso. valoresMonetariosVisibles false restringe únicamente precios y costos.
+Si recibes REFERENCIA_PRODUCTO_AMBIGUA o sugerencias de productos, nombra las opciones y pide confirmación. No afirmes que el producto no existe hasta que el backend descarte todas las coincidencias.
+Si recibes LISTADO_ROLES, LISTADO_BODEGAS o LISTADO_ROLES_Y_BODEGAS, esos catálogos están autorizados: indica sus nombres. Si recibes DETALLE_USUARIO y accesoDetalleUsuarios true, responde directamente con el usuario encontrado. Nunca confundas "no encontrado" con "sin acceso".
+Si recibes ESTUDIO_ESTADISTICO_MOVIMIENTOS, explica las cifras calculadas por el backend. Empieza por balance, entradas, salidas y comparación anterior. Después menciona productos destacados, anomalías y cobertura de stock. No inventes causas ni recalcules cifras. Divide un análisis extenso en varios turnos.
+Puedes consultar una bodega distinta de la que está seleccionada en pantalla cuando el usuario la nombre. El backend valida el acceso y devuelve bodegaConsultada. Si recibes VISTA_GENERAL_BODEGA, confirma su nombre, ofrece un resumen ejecutivo y pregunta qué módulo desea revisar a detalle. Conserva el nombre de esa bodega en las preguntas siguientes hasta que el usuario nombre otra.
+Si recibes COMPARATIVA_ESTADISTICA_BODEGAS, presenta el ranking completo desde uno hasta N para entradas y salidas en el periodo solicitado. Después menciona el producto con mayor salida de cada bodega. Aclara que el ranking usa cantidad de movimientos y que las cantidades físicas se mantienen separadas por unidad. Conserva la comparativa si el usuario cambia el periodo.
+  Nunca pidas IDs técnicos ni los pronuncies. Identifica productos, usuarios y registros por nombres o códigos comprensibles.
+  En proyectos puedes consultar todos los proyectos de la bodega activa cuando el resultado lo autorice. Puedes explicar estado, fechas, porcentaje y kilómetros de avance, encargado, técnicos, roles, productos, solicitudes, avances y nodos. Si hay varias coincidencias, nómbralas por nombre y código y pregunta cuál desea consultar. Solo menciona costos cuando valoresMonetariosVisibles sea true; nunca los estimes si fueron ocultados.
+  No uses Markdown, asteriscos, tablas, enlaces ni bloques de código. Habla con frases naturales.
+  Cuando recibas un array de nombres, pronúncialo como una sola frase separada por comas. Nunca uses guiones, números, viñetas, corchetes, comillas ni símbolos delante de los nombres. Ejemplo correcto: AI, Control, Mochila.
+Cuando el usuario pida mucho detalle, divídelo en varios turnos breves y pregunta si desea continuar.
 No realices acciones de edición, eliminación, aprobación o rechazo.
 Cuando pregunten por las auditorías, llama a consultar_sistema. Si el resultado tiene modo LISTADO_AUDITORIAS, indica el total, enumera únicamente sus títulos y pregunta: "¿De cuál auditoría quieres conocer la información?". Cuando el usuario responda con un título completo o parcial, vuelve a llamar a consultar_sistema conservando exactamente ese nombre y explica el resultado DETALLE_AUDITORIA en profundidad. Nunca solicites un ID.
 Las únicas acciones de escritura permitidas son crear solicitudes de recursos, programar checklists por rol y registrar productos con las funciones autorizadas.
@@ -143,6 +158,14 @@ export class DeepgramVoiceAgent {
       voiceLog('Configuración del agente aceptada por Deepgram')
       this.cleanReconnectAttempts = 0
       session.updatePrompt(PROMPT_BODEGA_APLISMART)
+      session.updateSpeak({
+        provider: {
+          type: 'deepgram',
+          version: 'v1',
+          model: bootstrap.voice || 'aura-2-javier-es',
+          speed: 0.95,
+        },
+      })
       microphone.unmute()
       this.callbacks.onReady?.()
       this.callbacks.onState('listening')
@@ -155,7 +178,9 @@ export class DeepgramVoiceAgent {
       // acumule su copia defectuosa antes de que pueda iniciarse una reconexión.
       session.conversationHistory = []
       if (message.role !== 'user' && message.role !== 'assistant') return
-      const content = message.content?.trim()
+      const content = message.role === 'assistant'
+        ? cleanVoiceTranscript(message.content ?? '')
+        : message.content?.trim()
       if (!content) return
       const item: VoiceAgentMessage = { role: message.role, content }
       this.history.push(item)
@@ -225,8 +250,18 @@ export class DeepgramVoiceAgent {
         const args = JSON.parse(call.arguments || '{}') as Record<string, unknown>
         let resultado: unknown
         if (call.name === 'consultar_sistema') {
-          const mensaje = String(args.mensaje ?? args.consulta ?? args.query ?? '').trim()
+          const mensajeFuncion = String(args.mensaje ?? args.consulta ?? args.query ?? '').trim()
+          // La transcripción del usuario es la fuente primaria. El LLM puede
+          // parafrasear nombres al construir los argumentos de la función y
+          // romper referencias como "HOT 60 Pro".
+          const mensajeUsuario = [...this.history].reverse().find((item) => item.role === 'user')?.content?.trim() ?? ''
+          const mensaje = mensajeUsuario || mensajeFuncion
           if (!mensaje) throw new Error('La consulta llegó vacía.')
+          voiceLog('Referencia de consulta resuelta', {
+            transcripcionUsuario: mensajeUsuario,
+            argumentoFuncion: mensajeFuncion,
+            fuente: mensajeUsuario ? 'transcripcion_usuario' : 'argumento_funcion',
+          })
           resultado = await api.post<unknown>('/auditoria-inteligente/voz/contexto', {
             mensaje,
             bodegaId: this.callbacks.bodegaId || undefined,
@@ -306,7 +341,13 @@ export class DeepgramVoiceAgent {
           throw new Error('Función no permitida.')
         }
         voiceLog('Función completada', { id: call.id, name: call.name })
-        this.session?.sendFunctionCallResponse(call.id, call.name, JSON.stringify(resultado))
+        const voicePayload = createVoiceFunctionPayload(resultado)
+        voiceLog('Contexto preparado para voz', {
+          funcion: call.name,
+          bytesOriginales: JSON.stringify(resultado).length,
+          bytesVoz: voicePayload.length,
+        })
+        this.session?.sendFunctionCallResponse(call.id, call.name, voicePayload)
       } catch (error) {
         const detail = error instanceof Error ? error.message : 'No se pudo consultar el sistema.'
         console.error('[DeepgramVoice] Falló la función', { id: call.id, name: call.name, error: detail })

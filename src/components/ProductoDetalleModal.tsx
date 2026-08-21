@@ -22,6 +22,7 @@ import { EditarProductoModal } from './EditarProductoModal'
 import { useAuth } from '../store/auth'
 import { imageUrl } from '../lib/apiBase'
 import { Modal } from './Modal'
+import { ValorBlur } from '../lib/valorBlur'
 
 type Props = {
   producto: Producto
@@ -227,7 +228,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted, onUpdated }
                 )}
                 <Info
                   label="Precio"
-                  value={formatPesos(p.precio)}
+                  value={<ValorBlur value={p.precio} />}
                   icon={DollarSign}
                 />
               </div>
@@ -309,7 +310,7 @@ export function ProductoDetalleModal({ producto, onClose, onDeleted, onUpdated }
                           className="text-muted-foreground"
                           style={{ fontFamily: "'JetBrains Mono', monospace" }}
                         >
-                          {formatPesos(pp.precioCompra)}
+                          <ValorBlur value={pp.precioCompra} />
                         </span>
                       </li>
                     ))}
@@ -494,7 +495,7 @@ function Info({
   accent,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   icon: typeof Package
   accent?: string
 }) {

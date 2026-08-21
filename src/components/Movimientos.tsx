@@ -28,6 +28,7 @@ import { PageHeader } from './PageHeader'
 import { useBodegaActiva } from '../store/bodegaActiva'
 import { useAuth } from '../store/auth'
 import { api } from '../lib/api'
+import { ValorBlur, ValorInputBlur } from '../lib/valorBlur'
 import { Modal } from './Modal'
 import { Modal as LegacyModal } from './checklist/Modal'
 import { SelectMobile } from './SelectMobile'
@@ -51,6 +52,16 @@ export function Movimientos() {
   const prodState = useProductos()
   const unidadesState = useUnidadesMedida()
 
+  // ⚠️ El botón "Nueva Compra" abre SIEMPRE el form de Compra (que
+  // internamente llama a `POST /compras` -> permiso `movimientos.crear`).
+  // El `puedeEditar` viejo chequeaba `inventario.editar` (el del flujo
+  // legacy de movimientos simples), lo cual era INCORRECTO para este
+  // botón y dejaba bloqueado a cualquier rol con `movimientos.crear`
+  // pero sin `inventario.editar` (caso típico del BODEGUERO).
+  const puedeCrearCompra =
+    auth.status === 'autenticado' && auth.sesion.permisos.includes('movimientos.crear')
+  // Quedan como helper para el flujo de movimientos simples (entrada /
+  // salida / ajuste) si se reactiva en el futuro.
   const puedeEditar =
     auth.status === 'autenticado' && auth.sesion.permisos.includes('inventario.editar')
 
@@ -172,7 +183,7 @@ export function Movimientos() {
             <button
               type="button"
               onClick={() => setOpenNuevo(true)}
-              disabled={!activaId || !puedeEditar}
+              disabled={!activaId || !puedeCrearCompra}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ borderRadius: '0.25rem' }}
             >
@@ -200,7 +211,7 @@ export function Movimientos() {
         <button
           type="button"
           onClick={() => setOpenNuevo(true)}
-          disabled={!activaId || !puedeEditar}
+          disabled={!activaId || !puedeCrearCompra}
           className="inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-2 bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ borderRadius: '0.25rem' }}
         >
@@ -1402,30 +1413,19 @@ function CompraForm({
                             </select>
                           </div>
                           <div className="col-span-12 md:col-span-2">
-                            <input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              value={it.precioUnitario ?? ''}
-                              onChange={(e) =>
-                                actualizarItem(it.id, {
-                                  precioUnitario: e.target.value
-                                    ? Number(e.target.value)
-                                    : undefined,
-                                })
-                              }
-                              placeholder="Precio"
+                            <ValorInputBlur
+                              value={it.precioUnitario ?? 0}
+                              asCurrency
                               className="w-full px-3 py-2.5 bg-muted/50 border border-border text-sm text-foreground cursor-not-allowed"
-                              style={{ borderRadius: '0.25rem' }}
-                              disabled
+                              placeholder="Precio"
                             />
                           </div>
                         </div>
                         {prod && (
                           <div className="flex justify-end text-[10px] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                            {it.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 3 })} × {(it.precioUnitario ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {it.cantidad.toLocaleString('es-CO', { maximumFractionDigits: 3 })} × <ValorBlur value={Number(it.precioUnitario ?? 0)} render={(v) => v} />
                             <span className="ml-2 font-semibold text-foreground">
-                              = {((it.precioUnitario ?? 0) * it.cantidad).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              = <ValorBlur value={(it.precioUnitario ?? 0) * it.cantidad} render={(v) => v} />
                             </span>
                           </div>
                         )}
@@ -1458,7 +1458,10 @@ function CompraForm({
             >
               <span>Total de la factura:</span>
               <span className="text-foreground font-semibold">
-                {totalEstimado.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <ValorBlur
+                  value={totalEstimado}
+                  render={(v) => v}
+                />
               </span>
             </div>
           )}
@@ -1942,7 +1945,10 @@ function DetalleCompra({ compraId }: { compraId: string }) {
           </DetalleItem>
           <DetalleItem label="Total de la factura">
             <span className="text-foreground font-semibold">
-              {Number(data.total).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <ValorBlur
+                value={Number(data.total)}
+                render={(v) => v}
+              />
             </span>
           </DetalleItem>
         </DetalleGrid>
@@ -2037,15 +2043,12 @@ function DetalleCompra({ compraId }: { compraId: string }) {
                         className="text-[10px] text-muted-foreground"
                         style={{ fontFamily: "'JetBrains Mono', monospace" }}
                       >
-                        · {Number(it.precioUnitario).toLocaleString('es-CO', {
-                          maximumFractionDigits: 2,
-                        })}{' '}
-                        c/u
+                        · <ValorBlur value={Number(it.precioUnitario)} render={(v) => `${v} c/u` as unknown as React.ReactNode} />
                       </span>
                     )}
                     {it.precioUnitario != null && (
                       <span className="text-[10px] font-semibold text-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        Subtotal: {(Number(it.precioUnitario) * Number(it.cantidad)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        Subtotal: <ValorBlur value={Number(it.precioUnitario) * Number(it.cantidad)} render={(v) => v} />
                       </span>
                     )}
                   </div>
